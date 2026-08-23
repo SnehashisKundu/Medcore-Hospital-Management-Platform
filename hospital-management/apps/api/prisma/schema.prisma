@@ -1,0 +1,1924 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Hospital {
+  id   String @id @default(uuid())
+  name String
+  code String @unique
+
+  email String?
+  phone String?
+
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  country      String   @default("India")
+  postalCode   String?
+  latitude     Decimal? @db.Decimal(10, 7)
+  longitude    Decimal? @db.Decimal(10, 7)
+
+  registrationNumber String? @unique
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  departments     Department[]
+  users           HospitalUser[]
+  roles           UserRole[]
+  doctors         DoctorHospital[]
+  patients        HospitalPatient[]
+  appointments    Appointment[]
+  emergencyCases  EmergencyCase[]
+  encounters      Encounter[]
+  suppliers       Supplier[]
+  medicineStocks  MedicineStock[]
+  diagnosticTests HospitalDiagnosticTest[]
+  charges         Charge[]
+  invoices        Invoice[]
+  wards           Ward[]
+  admissions      Admission[]
+  procedures      HospitalProcedure[]
+  auditLogs       AuditLog[]
+  staff           Staff[]
+
+  @@index([name])
+  @@index([city])
+  @@index([isActive])
+}
+
+model Department {
+  id String @id @default(uuid())
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+
+  name        String
+  code        String
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt         DateTime                     @default(now())
+  updatedAt         DateTime                     @updatedAt
+  doctorAssignments DoctorDepartmentAssignment[]
+  doctorSchedules   DoctorSchedule[]
+  emergencyCases    EmergencyCase[]
+
+  @@unique([hospitalId, code])
+  @@index([hospitalId])
+  @@index([name])
+  @@index([isActive])
+}
+
+model Specialization {
+  id String @id @default(uuid())
+
+  name        String
+  code        String  @unique
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  doctorAssignments DoctorDepartmentAssignment[]
+
+  @@index([name])
+  @@index([isActive])
+}
+
+model User {
+  id String @id @default(uuid())
+
+  email        String  @unique
+  phone        String? @unique
+  passwordHash String
+
+  firstName String
+  lastName  String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+  doctor    Doctor?
+  patient   Patient?
+
+  roles                       UserRole[]
+  hospitals                   HospitalUser[]
+  appointmentStatusChanges    AppointmentStatusHistory[]
+  appointmentReschedules      AppointmentReschedule[]
+  recordedVitals              EncounterVital[]
+  diagnosesMade               EncounterDiagnosis[]
+  clinicalNotesCreated        EncounterClinicalNote[]
+  prescriptionsCreated        Prescription[]
+  medicineDispenses           MedicineDispense[]
+  diagnosticOrdersCreated     DiagnosticOrder[]
+  labResultsReported          LabResult[]
+  imagingReportsReported      ImagingReport[]
+  diagnosticDocumentsUploaded DiagnosticDocument[]
+  procedureOrdersCreated      ProcedureOrder[]
+  procedureStaff              ProcedureStaffAssignment[]
+  dischargeSummariesPrepared  DischargeSummary[]
+  auditLogs                   AuditLog[]
+  staffProfiles               Staff[]
+  nursingNotesCreated         NursingNote[]
+  refreshTokens               RefreshToken[]
+  passwordResetTokens         PasswordResetToken[]
+
+  @@index([email])
+  @@index([isActive])
+}
+
+model RefreshToken {
+  id        String @id @default(uuid())
+  userId    String
+  tokenHash String @unique
+
+  expiresAt DateTime
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Role {
+  id String @id @default(uuid())
+
+  name        String  @unique
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users           UserRole[]
+  rolePermissions RolePermission[]
+}
+
+model UserRole {
+  id String @id @default(uuid())
+
+  userId     String
+  roleId     String
+  hospitalId String?
+
+  user     User      @relation(fields: [userId], references: [id])
+  role     Role      @relation(fields: [roleId], references: [id])
+  hospital Hospital? @relation(fields: [hospitalId], references: [id])
+
+  assignedAt DateTime @default(now())
+
+  @@unique([userId, roleId, hospitalId])
+  @@index([userId])
+  @@index([roleId])
+  @@index([hospitalId])
+}
+
+model Permission {
+  id String @id @default(uuid())
+
+  name        String  @unique
+  description String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  roles RolePermission[]
+}
+
+model RolePermission {
+  id String @id @default(uuid())
+
+  roleId       String
+  permissionId String
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  assignedAt DateTime @default(now())
+
+  @@unique([roleId, permissionId])
+  @@index([roleId])
+  @@index([permissionId])
+}
+
+model HospitalUser {
+  id String @id @default(uuid())
+
+  hospitalId String
+  userId     String
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+
+  isActive Boolean @default(true)
+
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hospitalId, userId])
+  @@index([hospitalId])
+  @@index([userId])
+}
+
+model Doctor {
+  id String @id @default(uuid())
+
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id])
+
+  medicalRegistrationNumber String @unique
+
+  qualification String?
+  bio           String?
+
+  // Experience before joining our system/hospital.
+  priorExperienceYears Int @default(0)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  hospitals DoctorHospital[]
+
+  @@index([medicalRegistrationNumber])
+  @@index([isActive])
+}
+
+model DoctorHospital {
+  id String @id @default(uuid())
+
+  doctorId   String
+  hospitalId String
+
+  doctor   Doctor   @relation(fields: [doctorId], references: [id])
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  joinedAt DateTime
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  departmentAssignments DoctorDepartmentAssignment[]
+  schedules             DoctorSchedule[]
+  leaves                DoctorLeave[]
+  appointments          Appointment[]
+  emergencyCases        EmergencyCase[]
+  encounters            Encounter[]
+
+  @@unique([doctorId, hospitalId])
+  @@index([doctorId])
+  @@index([hospitalId])
+  @@index([isActive])
+}
+
+model DoctorDepartmentAssignment {
+  id String @id @default(uuid())
+
+  doctorHospitalId String
+  departmentId     String
+  specializationId String
+
+  doctorHospital DoctorHospital @relation(fields: [doctorHospitalId], references: [id])
+  department     Department     @relation(fields: [departmentId], references: [id])
+  specialization Specialization @relation(fields: [specializationId], references: [id])
+
+  isPrimary Boolean @default(false)
+  isActive  Boolean @default(true)
+
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  appointments Appointment[]
+  encounters   Encounter[]
+
+  @@unique([doctorHospitalId, departmentId, specializationId])
+  @@index([doctorHospitalId])
+  @@index([departmentId])
+  @@index([specializationId])
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
+model DoctorSchedule {
+  id String @id @default(uuid())
+
+  doctorHospitalId String
+  departmentId     String
+
+  dayOfWeek DayOfWeek
+  startTime String
+  endTime   String
+
+  slotDurationMinutes Int
+
+  isActive Boolean @default(true)
+
+  doctorHospital DoctorHospital @relation(fields: [doctorHospitalId], references: [id])
+  department     Department     @relation(fields: [departmentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([doctorHospitalId])
+  @@index([departmentId])
+  @@index([dayOfWeek])
+}
+
+model DoctorLeave {
+  id String @id @default(uuid())
+
+  doctorHospitalId String
+
+  startAt DateTime
+  endAt   DateTime
+
+  reason String?
+
+  doctorHospital DoctorHospital @relation(fields: [doctorHospitalId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([doctorHospitalId])
+  @@index([startAt, endAt])
+}
+
+model Patient {
+  id String @id @default(uuid())
+
+  userId String? @unique
+  user   User?   @relation(fields: [userId], references: [id])
+
+  firstName  String
+  middleName String?
+  lastName   String?
+
+  dateOfBirth DateTime?
+  gender      Gender?
+
+  phone String?
+  email String?
+
+  bloodGroup BloodGroup?
+
+  addressLine1 String?
+  addressLine2 String?
+  city         String?
+  state        String?
+  country      String  @default("India")
+  postalCode   String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  hospitals         HospitalPatient[]
+  emergencyContacts PatientEmergencyContact[]
+  identifiers       PatientIdentifier[]
+  tags              PatientTagAssignment[]
+  appointments      Appointment[]
+  emergencyCases    EmergencyCase[]
+  encounters        Encounter[]
+  charges           Charge[]
+  invoices          Invoice[]
+  admissions        Admission[]
+  allergies         PatientAllergy[]
+
+  @@index([phone])
+  @@index([email])
+  @@index([firstName, lastName])
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+  UNKNOWN
+}
+
+enum BloodGroup {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
+model HospitalPatient {
+  id String @id @default(uuid())
+
+  hospitalId String
+  patientId  String
+
+  patientNumber String
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  registeredAt DateTime @default(now())
+  isActive     Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hospitalId, patientId])
+  @@unique([hospitalId, patientNumber])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([patientNumber])
+}
+
+model PatientEmergencyContact {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  name         String
+  relationship String
+  phone        String
+
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+}
+
+enum PatientIdentifierType {
+  AADHAAR
+  PASSPORT
+  DRIVING_LICENSE
+  VOTER_ID
+  ABHA
+  OTHER
+}
+
+model PatientIdentifier {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  type  PatientIdentifierType
+  value String
+
+  isVerified Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([type, value])
+  @@index([patientId])
+}
+
+model PatientTagAssignment {
+  id String @id @default(uuid())
+
+  patientId String
+  tagId     String
+
+  patient Patient    @relation(fields: [patientId], references: [id])
+  tag     PatientTag @relation(fields: [tagId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([patientId, tagId])
+  @@index([patientId])
+  @@index([tagId])
+}
+
+model PatientTag {
+  id String @id @default(uuid())
+
+  name        String  @unique
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patients PatientTagAssignment[]
+}
+
+enum AppointmentStatus {
+  BOOKED
+  CONFIRMED
+  CHECKED_IN
+  WAITING
+  IN_CONSULTATION
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  RESCHEDULED
+}
+
+enum AppointmentType {
+  OPD
+  IPD
+  WALK_IN
+  EMERGENCY
+  VIDEO
+  HOME_VISIT
+}
+
+enum AppointmentPriority {
+  NORMAL
+  URGENT
+  EMERGENCY
+}
+
+model Appointment {
+  id String @id @default(uuid())
+
+  hospitalId String
+  patientId  String
+
+  doctorHospitalId             String
+  doctorDepartmentAssignmentId String
+
+  appointmentNumber String
+
+  type     AppointmentType     @default(OPD)
+  status   AppointmentStatus   @default(BOOKED)
+  priority AppointmentPriority @default(NORMAL)
+
+  scheduledStart DateTime
+  scheduledEnd   DateTime
+
+  reason String?
+  notes  String?
+
+  checkedInAt       DateTime?
+  consultationStart DateTime?
+  completedAt       DateTime?
+  cancelledAt       DateTime?
+  encounter         Encounter?
+  deletedAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  doctorHospital DoctorHospital @relation(fields: [doctorHospitalId], references: [id])
+
+  doctorDepartmentAssignment DoctorDepartmentAssignment @relation(fields: [doctorDepartmentAssignmentId], references: [id])
+
+  statusHistory AppointmentStatusHistory[]
+  reschedules   AppointmentReschedule[]
+
+  @@unique([hospitalId, appointmentNumber])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([doctorHospitalId])
+  @@index([doctorDepartmentAssignmentId])
+  @@index([scheduledStart])
+  @@index([status])
+  @@index([priority])
+  @@index([deletedAt])
+}
+
+model AppointmentStatusHistory {
+  id String @id @default(uuid())
+
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  fromStatus AppointmentStatus?
+  toStatus   AppointmentStatus
+
+  changedById String?
+  changedBy   User?   @relation(fields: [changedById], references: [id])
+
+  reason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([appointmentId])
+  @@index([changedById])
+  @@index([createdAt])
+}
+
+model AppointmentReschedule {
+  id String @id @default(uuid())
+
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id])
+
+  previousStart DateTime
+  previousEnd   DateTime
+
+  newStart DateTime
+  newEnd   DateTime
+
+  reason String?
+
+  rescheduledById String?
+  rescheduledBy   User?   @relation(fields: [rescheduledById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([appointmentId])
+  @@index([rescheduledById])
+  @@index([createdAt])
+}
+
+enum TriageLevel {
+  RED
+  ORANGE
+  YELLOW
+  GREEN
+  BLUE
+}
+
+enum EmergencyStatus {
+  ARRIVED
+  TRIAGED
+  TREATMENT_STARTED
+  STABILIZED
+  ADMITTED
+  DISCHARGED
+  TRANSFERRED
+  CANCELLED
+}
+
+model EmergencyCase {
+  id String @id @default(uuid())
+
+  hospitalId String
+  patientId  String
+
+  emergencyNumber String
+
+  status      EmergencyStatus @default(ARRIVED)
+  triageLevel TriageLevel?
+
+  chiefComplaint     String?
+  arrivalAt          DateTime   @default(now())
+  triagedAt          DateTime?
+  treatmentStartedAt DateTime?
+  encounter          Encounter?
+
+  assignedDoctorHospitalId String?
+  assignedDepartmentId     String?
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  assignedDoctorHospital DoctorHospital? @relation(fields: [assignedDoctorHospitalId], references: [id])
+  assignedDepartment     Department?     @relation(fields: [assignedDepartmentId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hospitalId, emergencyNumber])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([triageLevel])
+  @@index([status])
+  @@index([arrivalAt])
+  @@index([assignedDoctorHospitalId])
+}
+
+enum EncounterStatus {
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum ConsultationType {
+  OPD
+  IPD
+  WALK_IN
+  EMERGENCY
+  VIDEO
+  HOME_VISIT
+}
+
+model Encounter {
+  id String @id @default(uuid())
+
+  hospitalId String
+  patientId  String
+
+  appointmentId   String? @unique
+  emergencyCaseId String? @unique
+
+  doctorHospitalId             String?
+  doctorDepartmentAssignmentId String?
+
+  encounterNumber String
+
+  status           EncounterStatus  @default(ACTIVE)
+  consultationType ConsultationType
+
+  chiefComplaint String?
+  remarks        String?
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  followUpRequired  Boolean @default(false)
+  followUpAfterDays Int?
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  appointment   Appointment?   @relation(fields: [appointmentId], references: [id])
+  emergencyCase EmergencyCase? @relation(fields: [emergencyCaseId], references: [id])
+
+  doctorHospital DoctorHospital? @relation(fields: [doctorHospitalId], references: [id])
+
+  doctorDepartmentAssignment DoctorDepartmentAssignment? @relation(fields: [doctorDepartmentAssignmentId], references: [id])
+
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  vitals           EncounterVital[]
+  diagnoses        EncounterDiagnosis[]
+  clinicalNotes    EncounterClinicalNote[]
+  prescriptions    Prescription[]
+  diagnosticOrders DiagnosticOrder[]
+  charges          Charge[]
+  admissions       Admission[]
+  procedureOrders  ProcedureOrder[]
+
+  @@unique([hospitalId, encounterNumber])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([doctorHospitalId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum DiagnosisType {
+  PROVISIONAL
+  DIFFERENTIAL
+  FINAL
+}
+
+enum ClinicalNoteType {
+  GENERAL
+  PROGRESS
+  FOLLOW_UP
+  DISCHARGE
+}
+
+model EncounterVital {
+  id String @id @default(uuid())
+
+  encounterId  String
+  recordedById String?
+
+  encounter  Encounter @relation(fields: [encounterId], references: [id])
+  recordedBy User?     @relation(fields: [recordedById], references: [id])
+
+  temperatureCelsius Float?
+
+  pulseRate        Int?
+  respiratoryRate  Int?
+  oxygenSaturation Float?
+
+  bloodPressureSystolic  Int?
+  bloodPressureDiastolic Int?
+
+  heightCm Float?
+  weightKg Float?
+  bmi      Float?
+
+  painScore    Int?
+  bloodGlucose Float?
+
+  remarks    String?
+  recordedAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+
+  @@index([encounterId])
+  @@index([recordedById])
+  @@index([recordedAt])
+}
+
+model EncounterDiagnosis {
+  id String @id @default(uuid())
+
+  encounterId   String
+  diagnosedById String?
+
+  encounter   Encounter @relation(fields: [encounterId], references: [id])
+  diagnosedBy User?     @relation(fields: [diagnosedById], references: [id])
+
+  type DiagnosisType
+
+  icd10Code     String?
+  diagnosisName String
+  description   String?
+
+  isPrimary Boolean @default(false)
+
+  diagnosedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+
+  @@index([encounterId])
+  @@index([diagnosedById])
+  @@index([icd10Code])
+  @@index([type])
+}
+
+model EncounterClinicalNote {
+  id String @id @default(uuid())
+
+  encounterId String
+  createdById String
+
+  encounter Encounter @relation(fields: [encounterId], references: [id])
+  createdBy User      @relation(fields: [createdById], references: [id])
+
+  noteType ClinicalNoteType
+  content  String
+
+  createdAt DateTime @default(now())
+
+  @@index([encounterId])
+  @@index([createdById])
+  @@index([noteType])
+  @@index([createdAt])
+}
+
+enum PrescriptionStatus {
+  ACTIVE
+  PARTIALLY_DISPENSED
+  DISPENSED
+  CANCELLED
+}
+
+enum MedicineRoute {
+  ORAL
+  IV
+  IM
+  TOPICAL
+  INHALATION
+  EYE_DROP
+  EAR_DROP
+  OTHER
+}
+
+enum MedicineTiming {
+  BEFORE_FOOD
+  AFTER_FOOD
+  WITH_FOOD
+  ANYTIME
+}
+
+model Medicine {
+  id String @id @default(uuid())
+
+  name         String
+  genericName  String?
+  brandName    String?
+  manufacturer String?
+
+  strength   String?
+  dosageForm String?
+  unit       String?
+
+  hsnCode    String?
+  gstPercent Decimal? @db.Decimal(5, 2)
+
+  barcode String? @unique
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prescriptionItems PrescriptionItem[]
+  stocks            MedicineStock[]
+
+  @@index([name])
+  @@index([genericName])
+  @@index([isActive])
+}
+
+model Prescription {
+  id String @id @default(uuid())
+
+  encounterId    String
+  prescribedById String
+
+  encounter    Encounter @relation(fields: [encounterId], references: [id])
+  prescribedBy User      @relation(fields: [prescribedById], references: [id])
+
+  status       PrescriptionStatus @default(ACTIVE)
+  instructions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items     PrescriptionItem[]
+  dispenses MedicineDispense[]
+
+  @@index([encounterId])
+  @@index([prescribedById])
+  @@index([status])
+}
+
+model PrescriptionItem {
+  id String @id @default(uuid())
+
+  prescriptionId String
+  medicineId     String
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id])
+  medicine     Medicine     @relation(fields: [medicineId], references: [id])
+
+  dosage    String
+  frequency String
+  duration  String
+
+  route  MedicineRoute?
+  timing MedicineTiming?
+
+  quantity      Int?
+  remarks       String?
+  dispenseItems MedicineDispenseItem[]
+
+  createdAt DateTime @default(now())
+
+  @@index([prescriptionId])
+  @@index([medicineId])
+}
+
+enum DispenseStatus {
+  PENDING
+  PARTIALLY_DISPENSED
+  DISPENSED
+  CANCELLED
+}
+
+enum StockMovementType {
+  PURCHASE
+  DISPENSE
+  RETURN
+  ADJUSTMENT
+  EXPIRED
+}
+
+model Supplier {
+  id String @id @default(uuid())
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+
+  name    String
+  phone   String?
+  email   String?
+  gstin   String?
+  address String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  medicineStocks MedicineStock[]
+
+  @@index([hospitalId])
+  @@index([name])
+}
+
+model MedicineStock {
+  id String @id @default(uuid())
+
+  hospitalId String
+  medicineId String
+  supplierId String?
+
+  batchNumber String
+  expiryDate  DateTime
+
+  purchasePrice Decimal @db.Decimal(10, 2)
+  sellingPrice  Decimal @db.Decimal(10, 2)
+
+  quantityAvailable Int
+  minimumStock      Int @default(0)
+
+  hospital Hospital  @relation(fields: [hospitalId], references: [id])
+  medicine Medicine  @relation(fields: [medicineId], references: [id])
+  supplier Supplier? @relation(fields: [supplierId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dispenseItems MedicineDispenseItem[]
+  movements     StockMovement[]
+
+  @@unique([hospitalId, medicineId, batchNumber])
+  @@index([hospitalId])
+  @@index([medicineId])
+  @@index([expiryDate])
+}
+
+model MedicineDispense {
+  id String @id @default(uuid())
+
+  prescriptionId String
+  dispensedById  String
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id])
+  dispensedBy  User         @relation(fields: [dispensedById], references: [id])
+
+  status      DispenseStatus @default(PENDING)
+  dispensedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items MedicineDispenseItem[]
+
+  @@index([prescriptionId])
+  @@index([dispensedById])
+  @@index([status])
+}
+
+model MedicineDispenseItem {
+  id String @id @default(uuid())
+
+  dispenseId         String
+  prescriptionItemId String
+  stockId            String
+
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+
+  dispense         MedicineDispense @relation(fields: [dispenseId], references: [id])
+  prescriptionItem PrescriptionItem @relation(fields: [prescriptionItemId], references: [id])
+  stock            MedicineStock    @relation(fields: [stockId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([dispenseId])
+  @@index([prescriptionItemId])
+  @@index([stockId])
+}
+
+model StockMovement {
+  id String @id @default(uuid())
+
+  stockId String
+  stock   MedicineStock @relation(fields: [stockId], references: [id])
+
+  type     StockMovementType
+  quantity Int
+
+  referenceType String?
+  referenceId   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([stockId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+enum DiagnosticCategory {
+  LAB
+  IMAGING
+}
+
+enum DiagnosticOrderStatus {
+  ORDERED
+  SCHEDULED
+  SAMPLE_COLLECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model DiagnosticTest {
+  id String @id @default(uuid())
+
+  name        String
+  code        String             @unique
+  category    DiagnosticCategory
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hospitalTests HospitalDiagnosticTest[]
+  orderItems    DiagnosticOrderItem[]
+
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+}
+
+model HospitalDiagnosticTest {
+  id String @id @default(uuid())
+
+  hospitalId       String
+  diagnosticTestId String
+
+  hospital       Hospital       @relation(fields: [hospitalId], references: [id])
+  diagnosticTest DiagnosticTest @relation(fields: [diagnosticTestId], references: [id])
+
+  price Decimal @db.Decimal(10, 2)
+
+  estimatedDurationMinutes Int?
+  isAvailable              Boolean @default(true)
+  isActive                 Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hospitalId, diagnosticTestId])
+  @@index([hospitalId])
+  @@index([diagnosticTestId])
+  @@index([price])
+  @@index([isAvailable])
+}
+
+model DiagnosticOrder {
+  id String @id @default(uuid())
+
+  encounterId String
+  orderedById String
+
+  encounter Encounter @relation(fields: [encounterId], references: [id])
+  orderedBy User      @relation(fields: [orderedById], references: [id])
+
+  clinicalNotes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items DiagnosticOrderItem[]
+
+  @@index([encounterId])
+  @@index([orderedById])
+  @@index([createdAt])
+}
+
+model DiagnosticOrderItem {
+  id String @id @default(uuid())
+
+  diagnosticOrderId String
+  diagnosticTestId  String
+
+  diagnosticOrder DiagnosticOrder @relation(fields: [diagnosticOrderId], references: [id])
+  diagnosticTest  DiagnosticTest  @relation(fields: [diagnosticTestId], references: [id])
+
+  status DiagnosticOrderStatus @default(ORDERED)
+
+  scheduledAt       DateTime?
+  sampleCollectedAt DateTime?
+  startedAt         DateTime?
+  completedAt       DateTime?
+
+  instructions  String?
+  labResult     LabResult?
+  imagingReport ImagingReport?
+  documents     DiagnosticDocument[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([diagnosticOrderId])
+  @@index([diagnosticTestId])
+  @@index([status])
+}
+
+model LabResult {
+  id String @id @default(uuid())
+
+  diagnosticOrderItemId String              @unique
+  diagnosticOrderItem   DiagnosticOrderItem @relation(fields: [diagnosticOrderItemId], references: [id])
+
+  reportedById String?
+  reportedBy   User?   @relation(fields: [reportedById], references: [id])
+
+  remarks String?
+
+  reportedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  values LabResultValue[]
+
+  @@index([reportedById])
+  @@index([reportedAt])
+}
+
+model LabResultValue {
+  id String @id @default(uuid())
+
+  labResultId String
+  labResult   LabResult @relation(fields: [labResultId], references: [id])
+
+  parameterName String
+  value         String
+  unit          String?
+
+  referenceRange String?
+  isAbnormal     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([labResultId])
+  @@index([parameterName])
+}
+
+model ImagingReport {
+  id String @id @default(uuid())
+
+  diagnosticOrderItemId String              @unique
+  diagnosticOrderItem   DiagnosticOrderItem @relation(fields: [diagnosticOrderItemId], references: [id])
+
+  reportedById String?
+  reportedBy   User?   @relation(fields: [reportedById], references: [id])
+
+  findings   String?
+  impression String?
+  conclusion String?
+
+  reportedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([reportedById])
+  @@index([reportedAt])
+}
+
+model DiagnosticDocument {
+  id String @id @default(uuid())
+
+  diagnosticOrderItemId String
+  diagnosticOrderItem   DiagnosticOrderItem @relation(fields: [diagnosticOrderItemId], references: [id])
+
+  uploadedById String?
+  uploadedBy   User?   @relation(fields: [uploadedById], references: [id])
+
+  fileName String
+  fileUrl  String
+  mimeType String?
+  fileSize Int?
+
+  createdAt DateTime @default(now())
+
+  @@index([diagnosticOrderItemId])
+  @@index([uploadedById])
+}
+
+enum ChargeType {
+  CONSULTATION
+  MEDICINE
+  LAB
+  IMAGING
+  PROCEDURE
+  BED
+  ROOM
+  NURSING
+  EMERGENCY
+  OTHER
+}
+
+enum ChargeStatus {
+  PENDING
+  BILLED
+  CANCELLED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  UPI
+  NET_BANKING
+  INSURANCE
+  OTHER
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  REFUNDED
+}
+
+model Charge {
+  id String @id @default(uuid())
+
+  hospitalId  String
+  patientId   String
+  encounterId String?
+
+  type   ChargeType
+  status ChargeStatus @default(PENDING)
+
+  description String
+
+  quantity  Decimal @default(1) @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(10, 2)
+  amount    Decimal @db.Decimal(12, 2)
+
+  referenceType String?
+  referenceId   String?
+
+  hospital  Hospital   @relation(fields: [hospitalId], references: [id])
+  patient   Patient    @relation(fields: [patientId], references: [id])
+  encounter Encounter? @relation(fields: [encounterId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoiceItem InvoiceItem?
+
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([encounterId])
+  @@index([type])
+  @@index([status])
+}
+
+model Invoice {
+  id String @id @default(uuid())
+
+  hospitalId String
+  patientId  String
+
+  invoiceNumber String
+
+  status InvoiceStatus @default(DRAFT)
+
+  subtotal       Decimal @db.Decimal(12, 2)
+  discountAmount Decimal @default(0) @db.Decimal(12, 2)
+  taxAmount      Decimal @default(0) @db.Decimal(12, 2)
+  totalAmount    Decimal @db.Decimal(12, 2)
+
+  issuedAt DateTime?
+  dueAt    DateTime?
+
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+  patient  Patient  @relation(fields: [patientId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  items    InvoiceItem[]
+  payments Payment[]
+
+  @@unique([hospitalId, invoiceNumber])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([status])
+}
+
+model InvoiceItem {
+  id String @id @default(uuid())
+
+  invoiceId String
+  chargeId  String @unique
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+  charge  Charge  @relation(fields: [chargeId], references: [id])
+
+  description String
+
+  quantity  Decimal @db.Decimal(10, 2)
+  unitPrice Decimal @db.Decimal(10, 2)
+  amount    Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+
+  @@index([invoiceId])
+  @@index([chargeId])
+}
+
+model Payment {
+  id String @id @default(uuid())
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id])
+
+  amount Decimal @db.Decimal(12, 2)
+
+  method PaymentMethod
+  status PaymentStatus @default(PENDING)
+
+  transactionReference String?
+  paidAt               DateTime?
+  blockchainHash       String?
+  blockchainTxId       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([invoiceId])
+  @@index([status])
+  @@index([transactionReference])
+}
+
+enum WardType {
+  GENERAL
+  ICU
+  NICU
+  PICU
+  CCU
+  EMERGENCY
+  MATERNITY
+  PEDIATRIC
+  ISOLATION
+  OTHER
+}
+
+enum BedStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+  CLEANING
+  MAINTENANCE
+  BLOCKED
+}
+
+enum AdmissionStatus {
+  ADMITTED
+  TRANSFERRED
+  DISCHARGED
+  CANCELLED
+}
+
+model Ward {
+  id String @id @default(uuid())
+
+  hospitalId String
+  hospital   Hospital @relation(fields: [hospitalId], references: [id])
+
+  name  String
+  code  String
+  type  WardType
+  floor Int
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rooms Room[]
+
+  @@unique([hospitalId, code])
+  @@index([hospitalId])
+  @@index([type])
+  @@index([floor])
+  @@index([isActive])
+}
+
+model Room {
+  id String @id @default(uuid())
+
+  wardId String
+  ward   Ward   @relation(fields: [wardId], references: [id])
+
+  roomNumber String
+  name       String?
+
+  dailyCharge Decimal @default(0) @db.Decimal(10, 2)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  beds Bed[]
+
+  @@unique([wardId, roomNumber])
+  @@index([wardId])
+  @@index([isActive])
+}
+
+model Bed {
+  id String @id @default(uuid())
+
+  roomId String
+  room   Room   @relation(fields: [roomId], references: [id])
+
+  bedNumber String
+  status    BedStatus @default(AVAILABLE)
+
+  dailyCharge Decimal @default(0) @db.Decimal(10, 2)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  allocations BedAllocation[]
+
+  @@unique([roomId, bedNumber])
+  @@index([roomId])
+  @@index([status])
+  @@index([isActive])
+}
+
+model Admission {
+  id String @id @default(uuid())
+
+  hospitalId  String
+  patientId   String
+  encounterId String?
+
+  admissionNumber String
+
+  status AdmissionStatus @default(ADMITTED)
+
+  admittedAt   DateTime  @default(now())
+  dischargedAt DateTime?
+
+  reason           String?
+  dischargeSummary DischargeSummary?
+
+  hospital  Hospital   @relation(fields: [hospitalId], references: [id])
+  patient   Patient    @relation(fields: [patientId], references: [id])
+  encounter Encounter? @relation(fields: [encounterId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  bedAllocations  BedAllocation[]
+  procedureOrders ProcedureOrder[]
+  nursingNotes    NursingNote[]
+
+  @@unique([hospitalId, admissionNumber])
+  @@index([hospitalId])
+  @@index([patientId])
+  @@index([encounterId])
+  @@index([status])
+}
+
+model BedAllocation {
+  id String @id @default(uuid())
+
+  admissionId String
+  bedId       String
+
+  admission Admission @relation(fields: [admissionId], references: [id])
+  bed       Bed       @relation(fields: [bedId], references: [id])
+
+  allocatedAt DateTime  @default(now())
+  releasedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([admissionId])
+  @@index([bedId])
+  @@index([allocatedAt])
+}
+
+enum ProcedureCategory {
+  MINOR
+  MAJOR
+  SURGERY
+  THERAPEUTIC
+  DIAGNOSTIC
+  OTHER
+}
+
+enum ProcedureStatus {
+  ORDERED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  POSTPONED
+}
+
+enum ProcedureStaffRole {
+  PRIMARY_SURGEON
+  ASSISTANT_SURGEON
+  ANESTHETIST
+  NURSE
+  TECHNICIAN
+  OTHER
+}
+
+model Procedure {
+  id String @id @default(uuid())
+
+  name        String
+  code        String            @unique
+  category    ProcedureCategory
+  description String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  hospitalProcedures HospitalProcedure[]
+  orders             ProcedureOrder[]
+
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+}
+
+model HospitalProcedure {
+  id String @id @default(uuid())
+
+  hospitalId  String
+  procedureId String
+
+  hospital  Hospital  @relation(fields: [hospitalId], references: [id])
+  procedure Procedure @relation(fields: [procedureId], references: [id])
+
+  basePrice Decimal @db.Decimal(12, 2)
+
+  estimatedDurationMinutes Int?
+
+  isAvailable Boolean @default(true)
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hospitalId, procedureId])
+  @@index([hospitalId])
+  @@index([procedureId])
+  @@index([isAvailable])
+}
+
+model ProcedureOrder {
+  id String @id @default(uuid())
+
+  encounterId String
+  admissionId String?
+  procedureId String
+  orderedById String
+
+  encounter Encounter  @relation(fields: [encounterId], references: [id])
+  admission Admission? @relation(fields: [admissionId], references: [id])
+  procedure Procedure  @relation(fields: [procedureId], references: [id])
+  orderedBy User       @relation(fields: [orderedById], references: [id])
+
+  status ProcedureStatus @default(ORDERED)
+
+  reason       String?
+  instructions String?
+
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+
+  startedAt   DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff ProcedureStaffAssignment[]
+
+  @@index([encounterId])
+  @@index([admissionId])
+  @@index([procedureId])
+  @@index([orderedById])
+  @@index([status])
+  @@index([scheduledStart])
+}
+
+model ProcedureStaffAssignment {
+  id String @id @default(uuid())
+
+  procedureOrderId String
+  userId           String
+
+  procedureOrder ProcedureOrder @relation(fields: [procedureOrderId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+
+  role ProcedureStaffRole
+
+  assignedAt DateTime @default(now())
+
+  @@unique([procedureOrderId, userId, role])
+  @@index([procedureOrderId])
+  @@index([userId])
+  @@index([role])
+}
+
+enum DischargeType {
+  NORMAL
+  AGAINST_MEDICAL_ADVICE
+  TRANSFERRED
+  ABSCONDED
+  DEATH
+  OTHER
+}
+
+model DischargeSummary {
+  id String @id @default(uuid())
+
+  admissionId String    @unique
+  admission   Admission @relation(fields: [admissionId], references: [id])
+
+  preparedById String
+  preparedBy   User   @relation(fields: [preparedById], references: [id])
+
+  dischargeType DischargeType @default(NORMAL)
+
+  finalDiagnosis       String?
+  hospitalCourse       String?
+  conditionAtDischarge String?
+
+  dischargeAdvice String?
+  dietAdvice      String?
+  activityAdvice  String?
+
+  followUpRequired Boolean   @default(false)
+  followUpDate     DateTime?
+  followUpNotes    String?
+
+  dischargedAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([preparedById])
+  @@index([dischargedAt])
+}
+
+enum AuditAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  EXPORT
+  PRINT
+}
+
+model AuditLog {
+  id String @id @default(uuid())
+
+  hospitalId String?
+  userId     String?
+
+  action AuditAction
+
+  entityType String
+  entityId   String?
+
+  metadata Json?
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  hospital Hospital? @relation(fields: [hospitalId], references: [id])
+  user     User?     @relation(fields: [userId], references: [id])
+
+  @@index([hospitalId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+model Staff {
+  id String @id @default(uuid())
+
+  userId     String
+  hospitalId String
+
+  employeeCode String
+
+  designation String?
+  joiningDate DateTime?
+
+  isActive Boolean @default(true)
+
+  user     User     @relation(fields: [userId], references: [id])
+  hospital Hospital @relation(fields: [hospitalId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([hospitalId, employeeCode])
+  @@unique([hospitalId, userId])
+  @@index([hospitalId])
+  @@index([userId])
+}
+
+model NursingNote {
+  id String @id @default(uuid())
+
+  admissionId String
+  createdById String
+
+  admission Admission @relation(fields: [admissionId], references: [id])
+  createdBy User      @relation(fields: [createdById], references: [id])
+
+  note String
+
+  recordedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@index([admissionId])
+  @@index([createdById])
+  @@index([recordedAt])
+}
+
+model PatientAllergy {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  allergen String
+  reaction String?
+  severity String?
+  notes    String?
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([allergen])
+}

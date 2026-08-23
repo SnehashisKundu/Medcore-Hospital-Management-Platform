@@ -1,0 +1,22 @@
+                    MedCore Ecosystem
+
+               ┌─────────────────────┐
+               │   Patient Mobile    │
+               └─────────────────────┘
+                         │
+      ┌──────────────────┼──────────────────┐
+      │                  │                  │
+      ▼                  ▼                  ▼
+ Nearby Hospitals    Book Appointment    Emergency SOS
+      │                  │                  │
+      ▼                  ▼                  ▼
+ Bed Availability    Doctor Search     Ambulance
+      │                  │                  │
+      └──────────────────┼──────────────────┘
+                         │
+                  MedCore Cloud
+                         │
+ ┌─────────────┬──────────────┬──────────────┐
+ │             │              │              │
+ ▼             ▼              ▼              ▼
+Hospital ERP  Pharmacy     Laboratory     Billing
