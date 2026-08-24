@@ -149,6 +149,40 @@ export async function deleteHospital(id: string) {
   });
 }
 
+/*
+  Hospital Verification
+*/
+export async function verifyHospital(
+  id: string,
+  verifiedById: string
+) {
+  const hospital = await prisma.hospital.findFirst({
+    where: {
+      id,
+      deletedAt: null,
+    },
+  });
+
+  if (!hospital) {
+    throw new Error("HOSPITAL_NOT_FOUND");
+  }
+
+  if (hospital.isVerified) {
+    throw new Error("HOSPITAL_ALREADY_VERIFIED");
+  }
+
+  return prisma.hospital.update({
+    where: {
+      id,
+    },
+    data: {
+      isVerified: true,
+      verifiedAt: new Date(),
+      verifiedById,
+    },
+  });
+}
+
 function calculateDistanceKm(
   userLatitude: number,
   userLongitude: number,

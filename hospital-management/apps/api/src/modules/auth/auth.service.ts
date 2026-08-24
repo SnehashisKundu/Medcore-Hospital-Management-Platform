@@ -40,9 +40,23 @@ interface ResetPasswordInput {
   newPassword: string;
 }
 
+interface VerifyEmailOtpInput {
+  email: string;
+  otp: string;
+}
+
+interface ResendEmailVerificationOtpInput {
+  email: string;
+}
+
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
 const PASSWORD_RESET_TOKEN_EXPIRY_MINUTES = 15;
+const EMAIL_VERIFICATION_OTP_EXPIRY_MINUTES = 10;
+
+function generateEmailVerificationOtp(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
 
 export async function loginUser(input: LoginInput) {
   const email = input.email.trim().toLowerCase();
@@ -80,7 +94,12 @@ export async function loginUser(input: LoginInput) {
     throw new Error("INVALID_CREDENTIALS");
   }
 
-  // 4. Build role information
+  // 4. Block unverified email users
+  if (!user.isEmailVerified) {
+    throw new Error("EMAIL_NOT_VERIFIED");
+  }
+
+  // 5. Build role information
   const roles = user.roles.map((userRole) => ({
     role: userRole.role.name,
     hospitalId: userRole.hospitalId,
@@ -92,7 +111,7 @@ export async function loginUser(input: LoginInput) {
     throw new Error("JWT_SECRET is not defined");
   }
 
-  // 5. Generate Access Token
+  // 6. Generate Access Token
   const accessToken = jwt.sign(
     {
       sub: user.id,
@@ -104,7 +123,7 @@ export async function loginUser(input: LoginInput) {
     }
   );
 
-  // 6. Generate Refresh Token
+  // 7. Generate Refresh Token
   const refreshToken = generateRefreshToken();
   const tokenHash = hashRefreshToken(refreshToken);
 
@@ -113,7 +132,7 @@ export async function loginUser(input: LoginInput) {
     expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS
   );
 
-  // 7. Store only hashed refresh token
+  // 8. Store only hashed refresh token
   await prisma.refreshToken.create({
     data: {
       userId: user.id,
@@ -122,7 +141,7 @@ export async function loginUser(input: LoginInput) {
     },
   });
 
-  // 8. Create LOGIN audit log
+  // 9. Create LOGIN audit log
   const hospitalId =
     roles.length === 1 ? roles[0].hospitalId ?? undefined : undefined;
 
@@ -140,7 +159,7 @@ export async function loginUser(input: LoginInput) {
     },
   });
 
-  // 9. Return tokens and user
+  // 10. Return tokens and user
   return {
     accessToken,
     refreshToken,
@@ -203,6 +222,10 @@ export async function refreshAccessToken(
     throw new Error("ACCOUNT_INACTIVE");
   }
 
+  if (!user.isEmailVerified) {
+    throw new Error("EMAIL_NOT_VERIFIED");
+  }
+
   // 5. Build latest roles
   const roles = user.roles.map((userRole) => ({
     role: userRole.role.name,
@@ -236,8 +259,7 @@ export async function refreshAccessToken(
     expiresAt.getDate() + REFRESH_TOKEN_EXPIRY_DAYS
   );
 
-  // 8. Rotate token:
-  // revoke old + create new
+  // 8. Rotate token
   await prisma.$transaction([
     prisma.refreshToken.update({
       where: {
@@ -449,21 +471,183 @@ export async function registerUser(input: RegisterInput) {
   // 2. Hash password
   const passwordHash = await hashPassword(input.password);
 
-  // 3. Create user
-  const user = await prisma.user.create({
-    data: {
-      email,
-      passwordHash,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      isActive: true,
-    },
+  // 3. Generate OTP
+  const otp = generateEmailVerificationOtp();
+  const otpHash = hashToken(otp);
+
+  const expiresAt = new Date();
+  expiresAt.setMinutes(
+    expiresAt.getMinutes() +
+      EMAIL_VERIFICATION_OTP_EXPIRY_MINUTES
+  );
+
+  // 4. Create user and OTP together
+  const result = await prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        email,
+        passwordHash,
+        firstName: input.firstName,
+        lastName: input.lastName,
+        isActive: true,
+        isEmailVerified: false,
+      },
+    });
+
+    await tx.emailVerificationOtp.create({
+      data: {
+        userId: user.id,
+        otpHash: otpHash,
+        expiresAt,
+      },
+    });
+
+    return user;
   });
 
+  // Development/testing response.
+  // Later email service integration will send this OTP via email.
   return {
-    id: user.id,
+    id: result.id,
+    email: result.email,
+    firstName: result.firstName,
+    lastName: result.lastName,
+    otp,
+  };
+}
+
+export async function verifyEmailOtp(
+  input: VerifyEmailOtpInput
+) {
+  const email = input.email.trim().toLowerCase();
+
+  // 1. Find user
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  if (!user.isActive || user.deletedAt) {
+    throw new Error("ACCOUNT_INACTIVE");
+  }
+
+  if (user.isEmailVerified) {
+    throw new Error("EMAIL_ALREADY_VERIFIED");
+  }
+
+  // 2. Find latest valid OTP
+  const verificationOtp =
+    await prisma.emailVerificationOtp.findFirst({
+      where: {
+        userId: user.id,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+  if (!verificationOtp) {
+    throw new Error("OTP_NOT_FOUND");
+  }
+
+  // 3. Check expiry
+  if (verificationOtp.expiresAt <= new Date()) {
+    await prisma.emailVerificationOtp.delete({
+      where: {
+        id: verificationOtp.id,
+      },
+    });
+
+    throw new Error("OTP_EXPIRED");
+  }
+
+  // 4. Verify OTP
+  const otpHash = hashToken(input.otp);
+
+  if (otpHash !== verificationOtp.otpHash) {
+    throw new Error("INVALID_OTP");
+  }
+
+  // 5. Verify email and remove OTP
+  await prisma.$transaction([
+    prisma.user.update({
+      where: {
+        id: user.id,
+      },
+      data: {
+        isEmailVerified: true,
+      },
+    }),
+
+    prisma.emailVerificationOtp.deleteMany({
+      where: {
+        userId: user.id,
+      },
+    }),
+  ]);
+
+  return {
     email: user.email,
-    firstName: user.firstName,
-    lastName: user.lastName,
+    isEmailVerified: true,
+  };
+}
+
+export async function resendEmailVerificationOtp(
+  input: ResendEmailVerificationOtpInput
+) {
+  const email = input.email.trim().toLowerCase();
+
+  // 1. Find user
+  const user = await prisma.user.findUnique({
+    where: { email },
+  });
+
+  if (!user) {
+    throw new Error("USER_NOT_FOUND");
+  }
+
+  if (!user.isActive || user.deletedAt) {
+    throw new Error("ACCOUNT_INACTIVE");
+  }
+
+  if (user.isEmailVerified) {
+    throw new Error("EMAIL_ALREADY_VERIFIED");
+  }
+
+  // 2. Generate new OTP
+  const otp = generateEmailVerificationOtp();
+  const otpHash = hashToken(otp);
+
+  const expiresAt = new Date();
+  expiresAt.setMinutes(
+    expiresAt.getMinutes() +
+      EMAIL_VERIFICATION_OTP_EXPIRY_MINUTES
+  );
+
+  // 3. Delete previous OTPs and create fresh one
+  await prisma.$transaction([
+    prisma.emailVerificationOtp.deleteMany({
+      where: {
+        userId: user.id,
+      },
+    }),
+
+    prisma.emailVerificationOtp.create({
+      data: {
+        userId: user.id,
+        otpHash: otpHash,
+        expiresAt,
+      },
+    }),
+  ]);
+
+  // Development/testing response.
+  // Later email service integration will send this OTP via email.
+  return {
+    email: user.email,
+    otp,
   };
 }

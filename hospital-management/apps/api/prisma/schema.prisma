@@ -31,7 +31,12 @@ model Hospital {
 
   registrationNumber String? @unique
 
-  isActive Boolean @default(true)
+  isActive   Boolean @default(true)
+  isVerified Boolean @default(false)
+
+  verifiedAt   DateTime?
+  verifiedById String?
+  verifiedBy User? @relation("HospitalVerifiedBy", fields: [verifiedById], references: [id])
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -59,6 +64,7 @@ model Hospital {
   @@index([name])
   @@index([city])
   @@index([isActive])
+  @@index([isVerified])
 }
 
 model Department {
@@ -114,6 +120,7 @@ model User {
   lastName  String?
 
   isActive Boolean @default(true)
+  isEmailVerified Boolean @default(false)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -142,9 +149,26 @@ model User {
   nursingNotesCreated         NursingNote[]
   refreshTokens               RefreshToken[]
   passwordResetTokens         PasswordResetToken[]
+  emailVerificationOtps       EmailVerificationOtp[]
+  verifiedHospitals           Hospital[] @relation("HospitalVerifiedBy")
 
   @@index([email])
   @@index([isActive])
+}
+
+model EmailVerificationOtp {
+  id String @id @default(uuid())
+
+  userId String
+  otpHash   String
+  expiresAt DateTime
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 model RefreshToken {

@@ -8,6 +8,8 @@ import {
   refreshAccessToken,
   registerUser,
   resetPassword,
+  verifyEmailOtp,
+  resendEmailVerificationOtp,
 } from "./auth.service";
 
 import { AuthRequest } from "./auth.middleware";
@@ -23,8 +25,7 @@ export async function loginController(
     if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message:
-          "Email and password are required",
+        message: "Email and password are required",
       });
     }
 
@@ -42,23 +43,25 @@ export async function loginController(
     });
   } catch (error) {
     if (error instanceof Error) {
-      if (
-        error.message ===
-        "INVALID_CREDENTIALS"
-      ) {
+      if (error.message === "INVALID_CREDENTIALS") {
         return res.status(401).json({
           success: false,
-          message:
-            "Invalid email or password",
+          message: "Invalid email or password",
         });
       }
 
-      if (
-        error.message === "ACCOUNT_INACTIVE"
-      ) {
+      if (error.message === "ACCOUNT_INACTIVE") {
         return res.status(403).json({
           success: false,
           message: "Account is inactive",
+        });
+      }
+
+      if (error.message === "EMAIL_NOT_VERIFIED") {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Email is not verified. Please verify your email first.",
         });
       }
     }
@@ -80,8 +83,7 @@ export async function meController(
     if (!req.user) {
       return res.status(401).json({
         success: false,
-        message:
-          "Authentication required",
+        message: "Authentication required",
       });
     }
 
@@ -95,6 +97,7 @@ export async function meController(
         firstName: true,
         lastName: true,
         isActive: true,
+        isEmailVerified: true,
         roles: {
           select: {
             hospitalId: true,
@@ -200,9 +203,7 @@ export async function changePasswordController(
     });
   } catch (error) {
     if (error instanceof Error) {
-      if (
-        error.message === "INVALID_CURRENT_PASSWORD"
-      ) {
+      if (error.message === "INVALID_CURRENT_PASSWORD") {
         return res.status(400).json({
           success: false,
           message: "Current password is incorrect",
@@ -228,7 +229,6 @@ export async function changePasswordController(
     });
   }
 }
-
 
 export async function forgotPasswordController(
   req: Request,
@@ -360,6 +360,14 @@ export async function refreshTokenController(
           message: "Account is inactive",
         });
       }
+
+      if (error.message === "EMAIL_NOT_VERIFIED") {
+        return res.status(403).json({
+          success: false,
+          message:
+            "Email is not verified. Please verify your email first.",
+        });
+      }
     }
 
     console.error("Refresh token error:", error);
@@ -370,6 +378,7 @@ export async function refreshTokenController(
     });
   }
 }
+
 export async function registerController(
   req: Request,
   res: Response
@@ -400,14 +409,13 @@ export async function registerController(
     return res.status(201).json({
       success: true,
       message:
-        "User registered successfully",
+        "User registered successfully. Please verify your email.",
       data: user,
     });
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message ===
-        "EMAIL_ALREADY_EXISTS"
+      error.message === "EMAIL_ALREADY_EXISTS"
     ) {
       return res.status(409).json({
         success: false,
@@ -415,8 +423,140 @@ export async function registerController(
       });
     }
 
+    console.error("Register error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}
+
+export async function verifyEmailOtpController(
+  req: Request,
+  res: Response
+) {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and OTP are required",
+      });
+    }
+
+    const result = await verifyEmailOtp({
+      email,
+      otp,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "USER_NOT_FOUND") {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (error.message === "ACCOUNT_INACTIVE") {
+        return res.status(403).json({
+          success: false,
+          message: "Account is inactive",
+        });
+      }
+
+      if (error.message === "EMAIL_ALREADY_VERIFIED") {
+        return res.status(409).json({
+          success: false,
+          message: "Email is already verified",
+        });
+      }
+
+      if (
+        error.message === "OTP_NOT_FOUND" ||
+        error.message === "INVALID_OTP"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid OTP",
+        });
+      }
+
+      if (error.message === "OTP_EXPIRED") {
+        return res.status(400).json({
+          success: false,
+          message: "OTP has expired. Please request a new OTP.",
+        });
+      }
+    }
+
+    console.error("Verify email OTP error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}
+
+export async function resendEmailVerificationOtpController(
+  req: Request,
+  res: Response
+) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+    }
+
+    const result =
+      await resendEmailVerificationOtp({
+        email,
+      });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "A new email verification OTP has been generated",
+      data: result,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "USER_NOT_FOUND") {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      if (error.message === "ACCOUNT_INACTIVE") {
+        return res.status(403).json({
+          success: false,
+          message: "Account is inactive",
+        });
+      }
+
+      if (error.message === "EMAIL_ALREADY_VERIFIED") {
+        return res.status(409).json({
+          success: false,
+          message: "Email is already verified",
+        });
+      }
+    }
+
     console.error(
-      "Register error:",
+      "Resend email verification OTP error:",
       error
     );
 

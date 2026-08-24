@@ -8,6 +8,7 @@ import {
   getNearbyHospitalsController,
   getHospitalByIdController,
   updateHospitalController,
+  verifyHospitalController,
   deleteHospitalController,
 } from "./hs.controller";
 
@@ -46,6 +47,13 @@ router.patch(
   authenticate,
   requirePermission("HOSPITAL_UPDATE"),
   updateHospitalController
+);
+
+router.patch(
+  "/:id/verify",
+  authenticate,
+  requirePermission("HOSPITAL_UPDATE"),
+  verifyHospitalController
 );
 
 router.delete(

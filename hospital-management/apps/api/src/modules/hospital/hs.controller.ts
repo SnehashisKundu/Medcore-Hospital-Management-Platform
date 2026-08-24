@@ -7,6 +7,7 @@ import {
   getHospitalById,
   updateHospital,
   deleteHospital,
+  verifyHospital,
 } from "./hs.service";
 
 import { AuthRequest } from "../auth/auth.middleware";
@@ -28,7 +29,6 @@ export async function createHospitalController(
 
     const hospital = await createHospital(req.body);
 
-    // Audit CREATE
     await createAuditLog({
       hospitalId: hospital.id,
       userId: req.user?.id,
@@ -45,6 +45,7 @@ export async function createHospitalController(
         country: hospital.country,
         registrationNumber: hospital.registrationNumber,
         isActive: hospital.isActive,
+        isVerified: hospital.isVerified,
         latitude: hospital.latitude,
         longitude: hospital.longitude,
       },
@@ -150,6 +151,7 @@ export async function getNearbyHospitalsController(
     });
   }
 }
+
 export async function getHospitalByIdController(
   req: Request,
   res: Response
@@ -193,7 +195,6 @@ export async function updateHospitalController(
       req.body
     );
 
-    // Audit UPDATE
     await createAuditLog({
       hospitalId: hospital.id,
       userId: req.user?.id,
@@ -210,6 +211,7 @@ export async function updateHospitalController(
         country: hospital.country,
         registrationNumber: hospital.registrationNumber,
         isActive: hospital.isActive,
+        isVerified: hospital.isVerified,
         latitude: hospital.latitude,
         longitude: hospital.longitude,
       },
@@ -248,6 +250,71 @@ export async function updateHospitalController(
   }
 }
 
+export async function verifyHospitalController(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: "Authentication required",
+      });
+    }
+
+    const hospital = await verifyHospital(
+      req.params.id as string,
+      req.user.id
+    );
+
+    await createAuditLog({
+      hospitalId: hospital.id,
+      userId: req.user.id,
+      action: "UPDATE",
+      entityType: "HOSPITAL",
+      entityId: hospital.id,
+      metadata: {
+        name: hospital.name,
+        code: hospital.code,
+        isVerified: hospital.isVerified,
+        verifiedAt: hospital.verifiedAt,
+        verifiedById: hospital.verifiedById,
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Hospital verified successfully",
+      data: hospital,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (error.message === "HOSPITAL_NOT_FOUND") {
+        return res.status(404).json({
+          success: false,
+          message: "Hospital not found",
+        });
+      }
+
+      if (error.message === "HOSPITAL_ALREADY_VERIFIED") {
+        return res.status(409).json({
+          success: false,
+          message: "Hospital is already verified",
+        });
+      }
+    }
+
+    console.error("Verify hospital error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}
+
 export async function deleteHospitalController(
   req: AuthRequest,
   res: Response
@@ -257,7 +324,6 @@ export async function deleteHospitalController(
       req.params.id as string
     );
 
-    // Audit DELETE
     await createAuditLog({
       hospitalId: hospital.id,
       userId: req.user?.id,
@@ -274,9 +340,10 @@ export async function deleteHospitalController(
         country: hospital.country,
         registrationNumber: hospital.registrationNumber,
         isActive: hospital.isActive,
+        isVerified: hospital.isVerified,
         latitude: hospital.latitude,
         longitude: hospital.longitude,
-        deletedAt: hospital.deletedAt,       
+        deletedAt: hospital.deletedAt,
       },
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
