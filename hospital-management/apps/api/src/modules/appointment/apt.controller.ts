@@ -11,6 +11,96 @@ import {
 import { AuthRequest } from "../auth/auth.middleware";
 import { createAuditLog } from "../audit-log/aud.service";
 
+const appointmentErrorMap: Record<
+  string,
+  [number, string]
+> = {
+  HOSPITAL_NOT_FOUND: [404, "Hospital not found"],
+
+  PATIENT_NOT_FOUND: [404, "Patient not found"],
+
+  DOCTOR_HOSPITAL_NOT_FOUND: [
+    404,
+    "Doctor is not assigned to this hospital",
+  ],
+
+  DOCTOR_ASSIGNMENT_NOT_FOUND: [
+    404,
+    "Doctor department assignment not found",
+  ],
+
+  APPOINTMENT_NOT_FOUND: [
+    404,
+    "Appointment not found",
+  ],
+
+  APPOINTMENT_NUMBER_EXISTS: [
+    409,
+    "Appointment number already exists",
+  ],
+
+  INVALID_APPOINTMENT_DATE: [
+    400,
+    "Invalid appointment date format",
+  ],
+
+  INVALID_APPOINTMENT_RANGE: [
+    400,
+    "Appointment end time must be later than start time",
+  ],
+
+  APPOINTMENT_MUST_BE_SAME_DAY: [
+    400,
+    "Appointment must start and end on the same day",
+  ],
+
+  DOCTOR_NOT_AVAILABLE_ON_DAY: [
+    409,
+    "Doctor is not available on the selected day",
+  ],
+
+  INVALID_DOCTOR_SCHEDULE_SLOT: [
+    409,
+    "Selected appointment time is not a valid doctor schedule slot",
+  ],
+
+  DOCTOR_ON_LEAVE: [
+    409,
+    "Doctor is on leave during the selected appointment time",
+  ],
+
+  APPOINTMENT_SLOT_ALREADY_BOOKED: [
+    409,
+    "Doctor already has an appointment during the selected time slot",
+  ],
+};
+
+function handleAppointmentError(
+  error: unknown,
+  res: Response,
+  label: string
+) {
+  if (
+    error instanceof Error &&
+    appointmentErrorMap[error.message]
+  ) {
+    const [status, message] =
+      appointmentErrorMap[error.message];
+
+    return res.status(status).json({
+      success: false,
+      message,
+    });
+  }
+
+  console.error(`${label}:`, error);
+
+  return res.status(500).json({
+    success: false,
+    message: "Internal server error",
+  });
+}
+
 export async function createAppointmentController(
   req: AuthRequest,
   res: Response
@@ -24,7 +114,7 @@ export async function createAppointmentController(
       appointmentNumber,
       scheduledStart,
       scheduledEnd,
-    } = req.body;
+    } = req.body ?? {};
 
     if (
       !hospitalId ||
@@ -41,7 +131,9 @@ export async function createAppointmentController(
       });
     }
 
-    const appointment = await createAppointment(req.body);
+    const appointment = await createAppointment(
+      req.body
+    );
 
     // Audit CREATE
     await createAuditLog({
@@ -51,9 +143,12 @@ export async function createAppointmentController(
       entityType: "APPOINTMENT",
       entityId: appointment.id,
       metadata: {
-        appointmentNumber: appointment.appointmentNumber,
+        appointmentNumber:
+          appointment.appointmentNumber,
         type: appointment.type,
         status: appointment.status,
+        scheduledStart: appointment.scheduledStart,
+        scheduledEnd: appointment.scheduledEnd,
       },
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
@@ -65,62 +160,11 @@ export async function createAppointmentController(
       data: appointment,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "HOSPITAL_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Hospital not found",
-      });
-    }
-
-    if (
-      error instanceof Error &&
-      error.message === "PATIENT_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Patient not found",
-      });
-    }
-
-    if (
-      error instanceof Error &&
-      error.message === "DOCTOR_HOSPITAL_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Doctor is not assigned to this hospital",
-      });
-    }
-
-    if (
-      error instanceof Error &&
-      error.message === "DOCTOR_ASSIGNMENT_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Doctor department assignment not found",
-      });
-    }
-
-    if (
-      error instanceof Error &&
-      error.message === "APPOINTMENT_NUMBER_EXISTS"
-    ) {
-      return res.status(409).json({
-        success: false,
-        message: "Appointment number already exists",
-      });
-    }
-
-    console.error("Create appointment error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return handleAppointmentError(
+      error,
+      res,
+      "Create appointment error"
+    );
   }
 }
 
@@ -136,12 +180,11 @@ export async function getAppointmentsController(
       data: appointments,
     });
   } catch (error) {
-    console.error("Get appointments error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return handleAppointmentError(
+      error,
+      res,
+      "Get appointments error"
+    );
   }
 }
 
@@ -159,22 +202,11 @@ export async function getAppointmentByIdController(
       data: appointment,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "APPOINTMENT_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
-    }
-
-    console.error("Get appointment error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return handleAppointmentError(
+      error,
+      res,
+      "Get appointment error"
+    );
   }
 }
 
@@ -185,7 +217,7 @@ export async function updateAppointmentController(
   try {
     const appointment = await updateAppointment(
       req.params.id as string,
-      req.body
+      req.body ?? {}
     );
 
     // Audit UPDATE
@@ -196,9 +228,13 @@ export async function updateAppointmentController(
       entityType: "APPOINTMENT",
       entityId: appointment.id,
       metadata: {
-        appointmentNumber: appointment.appointmentNumber,
+        appointmentNumber:
+          appointment.appointmentNumber,
         type: appointment.type,
+        priority: appointment.priority,
         status: appointment.status,
+        scheduledStart: appointment.scheduledStart,
+        scheduledEnd: appointment.scheduledEnd,
       },
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
@@ -210,22 +246,11 @@ export async function updateAppointmentController(
       data: appointment,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "APPOINTMENT_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
-    }
-
-    console.error("Update appointment error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return handleAppointmentError(
+      error,
+      res,
+      "Update appointment error"
+    );
   }
 }
 
@@ -246,8 +271,12 @@ export async function deleteAppointmentController(
       entityType: "APPOINTMENT",
       entityId: appointment.id,
       metadata: {
-        appointmentNumber: appointment.appointmentNumber,
+        appointmentNumber:
+          appointment.appointmentNumber,
+        type: appointment.type,
         status: appointment.status,
+        scheduledStart: appointment.scheduledStart,
+        scheduledEnd: appointment.scheduledEnd,
       },
       ipAddress: req.ip,
       userAgent: req.get("user-agent"),
@@ -258,21 +287,10 @@ export async function deleteAppointmentController(
       message: "Appointment deleted successfully",
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "APPOINTMENT_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Appointment not found",
-      });
-    }
-
-    console.error("Delete appointment error:", error);
-
-    return res.status(500).json({
-      success: false,
-      message: "Internal server error",
-    });
+    return handleAppointmentError(
+      error,
+      res,
+      "Delete appointment error"
+    );
   }
 }

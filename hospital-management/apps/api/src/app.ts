@@ -39,6 +39,8 @@ import hospitalProcedureRoutes from "./modules/hospital-procedure/hpcd.routes";
 import procedureOrderRoutes from "./modules/procedure-order/pod.routes";
 import procedureStaffAssignmentRoutes from "./modules/procedure-staff-assignment/psa.routes";
 import dischargeSummaryRoutes from "./modules/discharge-summary/ds.routes";
+import doctorScheduleRoutes from "./modules/doctor-schedule/ds.routes";
+import doctorLeaveRoutes from "./modules/doctor-leave/dl.routes";
 
 const app = express();
 
@@ -91,5 +93,7 @@ app.use("/api/v1/hospital-procedures", hospitalProcedureRoutes);
 app.use("/api/v1", procedureOrderRoutes);
 app.use("/api/v1", procedureStaffAssignmentRoutes);
 app.use("/api/v1/discharge-summaries", dischargeSummaryRoutes);
+app.use("/api/v1/doctor-schedules", doctorScheduleRoutes);
+app.use("/api/v1/doctor-leaves", doctorLeaveRoutes);
 
 export default app;
