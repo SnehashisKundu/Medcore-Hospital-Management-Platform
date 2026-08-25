@@ -41,6 +41,7 @@ import procedureStaffAssignmentRoutes from "./modules/procedure-staff-assignment
 import dischargeSummaryRoutes from "./modules/discharge-summary/ds.routes";
 import doctorScheduleRoutes from "./modules/doctor-schedule/ds.routes";
 import doctorLeaveRoutes from "./modules/doctor-leave/dl.routes";
+import treatmentPlanRoutes from "./modules/treatment-plan/tp.routes";
 
 const app = express();
 
@@ -95,5 +96,6 @@ app.use("/api/v1", procedureStaffAssignmentRoutes);
 app.use("/api/v1/discharge-summaries", dischargeSummaryRoutes);
 app.use("/api/v1/doctor-schedules", doctorScheduleRoutes);
 app.use("/api/v1/doctor-leaves", doctorLeaveRoutes);
+app.use("/api/v1/treatment-plans", treatmentPlanRoutes);
 
 export default app;

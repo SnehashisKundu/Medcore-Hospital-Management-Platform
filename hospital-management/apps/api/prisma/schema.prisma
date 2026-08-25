@@ -782,6 +782,12 @@ enum ConsultationType {
   HOME_VISIT
 }
 
+enum TreatmentPlanStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
 model Encounter {
   id String @id @default(uuid())
 
@@ -828,6 +834,7 @@ model Encounter {
   charges          Charge[]
   admissions       Admission[]
   procedureOrders  ProcedureOrder[]
+  treatmentPlans   TreatmentPlan[]
 
   @@unique([hospitalId, encounterNumber])
   @@index([hospitalId])
@@ -835,6 +842,25 @@ model Encounter {
   @@index([doctorHospitalId])
   @@index([status])
   @@index([startedAt])
+}
+
+model TreatmentPlan {
+  id String @id @default(uuid())
+
+  encounterId String
+
+  title       String
+  description String?
+
+  status TreatmentPlanStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  encounter Encounter @relation(fields: [encounterId], references: [id])
+
+  @@index([encounterId])
+  @@index([status])
 }
 
 enum DiagnosisType {
