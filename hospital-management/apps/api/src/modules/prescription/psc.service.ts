@@ -1,11 +1,5 @@
 import { prisma } from "../../config/prisma";
 
-type PrescriptionStatusValue =
-  | "ACTIVE"
-  | "PARTIALLY_DISPENSED"
-  | "DISPENSED"
-  | "CANCELLED";
-
 type MedicineRouteValue =
   | "ORAL"
   | "IV"
@@ -22,6 +16,36 @@ type MedicineTimingValue =
   | "WITH_FOOD"
   | "ANYTIME";
 
+const MEDICINE_ROUTE_ALIASES: Record<
+  string,
+  MedicineRouteValue
+> = {
+  ORAL: "ORAL",
+  BY_MOUTH: "ORAL",
+  PO: "ORAL",
+
+  IV: "IV",
+  INTRAVENOUS: "IV",
+
+  IM: "IM",
+  INTRAMUSCULAR: "IM",
+
+  TOPICAL: "TOPICAL",
+
+  INHALATION: "INHALATION",
+  INHALED: "INHALATION",
+
+  EYE_DROP: "EYE_DROP",
+  EYE_DROPS: "EYE_DROP",
+  OPHTHALMIC: "EYE_DROP",
+
+  EAR_DROP: "EAR_DROP",
+  EAR_DROPS: "EAR_DROP",
+  OTIC: "EAR_DROP",
+
+  OTHER: "OTHER",
+};
+
 const MEDICINE_TIMING_ALIASES: Record<
   string,
   MedicineTimingValue
@@ -29,19 +53,18 @@ const MEDICINE_TIMING_ALIASES: Record<
   BEFORE_FOOD: "BEFORE_FOOD",
   BEFORE_MEAL: "BEFORE_FOOD",
   BEFORE_MEALS: "BEFORE_FOOD",
-  BEFORE_EATING: "BEFORE_FOOD",
 
   AFTER_FOOD: "AFTER_FOOD",
   AFTER_MEAL: "AFTER_FOOD",
   AFTER_MEALS: "AFTER_FOOD",
-  AFTER_EATING: "AFTER_FOOD",
 
   WITH_FOOD: "WITH_FOOD",
   WITH_MEAL: "WITH_FOOD",
   WITH_MEALS: "WITH_FOOD",
 
   ANYTIME: "ANYTIME",
-  ANY_TIME: "ANYTIME",
+  AS_NEEDED: "ANYTIME",
+  PRN: "ANYTIME",
 };
 
 function normalizeEnumLikeValue(
@@ -54,38 +77,56 @@ function normalizeEnumLikeValue(
 }
 
 function normalizeMedicineRoute(
-  route?: string
+  route?: string | null
 ): MedicineRouteValue | undefined {
-  if (!route) {
+  if (
+    route === undefined ||
+    route === null
+  ) {
     return undefined;
+  }
+
+  if (
+    typeof route !== "string" ||
+    !route.trim()
+  ) {
+    throw new Error(
+      "INVALID_MEDICINE_ROUTE"
+    );
   }
 
   const normalized =
     normalizeEnumLikeValue(route);
 
-  const allowedRoutes = new Set<MedicineRouteValue>([
-    "ORAL",
-    "IV",
-    "IM",
-    "TOPICAL",
-    "INHALATION",
-    "EYE_DROP",
-    "EAR_DROP",
-    "OTHER",
-  ]);
+  const mappedRoute =
+    MEDICINE_ROUTE_ALIASES[normalized];
 
-  if (allowedRoutes.has(normalized as MedicineRouteValue)) {
-    return normalized as MedicineRouteValue;
+  if (!mappedRoute) {
+    throw new Error(
+      "INVALID_MEDICINE_ROUTE"
+    );
   }
 
-  throw new Error("INVALID_MEDICINE_ROUTE");
+  return mappedRoute;
 }
 
 function normalizeMedicineTiming(
-  timing?: string
+  timing?: string | null
 ): MedicineTimingValue | undefined {
-  if (!timing) {
+  if (
+    timing === undefined ||
+    timing === null
+  ) {
     return undefined;
+  }
+
+  if (
+    typeof timing !== "string" ||
+    !timing.trim()
+  ) {
+    throw new Error(
+      "INVALID_MEDICINE_TIMING"
+    );
   }
 
   const normalized =
@@ -95,7 +136,9 @@ function normalizeMedicineTiming(
     MEDICINE_TIMING_ALIASES[normalized];
 
   if (!mappedTiming) {
-    throw new Error("INVALID_MEDICINE_TIMING");
+    throw new Error(
+      "INVALID_MEDICINE_TIMING"
+    );
   }
 
   return mappedTiming;
@@ -107,100 +150,335 @@ interface PrescriptionItemInput {
   frequency: string;
   duration: string;
 
-  route?: string;
-  timing?: string;
+  route?: string | null;
+  timing?: string | null;
   quantity?: number;
-  remarks?: string;
+  remarks?: string | null;
 }
 
 interface CreatePrescriptionInput {
   encounterId: string;
   prescribedById: string;
-  instructions?: string;
+  instructions?: string | null;
   items: PrescriptionItemInput[];
 }
 
 interface UpdatePrescriptionInput {
-  instructions?: string;
-  status?: PrescriptionStatusValue;
+  instructions?: string | null;
+  status?: "CANCELLED";
+}
+
+function validatePrescriptionItem(
+  item: unknown
+): asserts item is PrescriptionItemInput {
+  if (
+    !item ||
+    typeof item !== "object" ||
+    Array.isArray(item)
+  ) {
+    throw new Error(
+      "INVALID_PRESCRIPTION_ITEM"
+    );
+  }
+
+  const prescriptionItem =
+    item as PrescriptionItemInput;
+
+  if (
+    typeof prescriptionItem.medicineId !==
+      "string" ||
+    !prescriptionItem.medicineId.trim() ||
+    typeof prescriptionItem.dosage !==
+      "string" ||
+    !prescriptionItem.dosage.trim() ||
+    typeof prescriptionItem.frequency !==
+      "string" ||
+    !prescriptionItem.frequency.trim() ||
+    typeof prescriptionItem.duration !==
+      "string" ||
+    !prescriptionItem.duration.trim()
+  ) {
+    throw new Error(
+      "INVALID_PRESCRIPTION_ITEM"
+    );
+  }
+
+  if (
+    prescriptionItem.quantity !== undefined &&
+    (
+      typeof prescriptionItem.quantity !==
+        "number" ||
+      !Number.isFinite(
+        prescriptionItem.quantity
+      ) ||
+      !Number.isInteger(
+        prescriptionItem.quantity
+      ) ||
+      prescriptionItem.quantity <= 0
+    )
+  ) {
+    throw new Error(
+      "INVALID_QUANTITY"
+    );
+  }
+
+  if (
+    prescriptionItem.remarks !== undefined &&
+    prescriptionItem.remarks !== null &&
+    typeof prescriptionItem.remarks !==
+      "string"
+  ) {
+    throw new Error(
+      "INVALID_PRESCRIPTION_ITEM"
+    );
+  }
+
+  normalizeMedicineRoute(
+    prescriptionItem.route
+  );
+
+  normalizeMedicineTiming(
+    prescriptionItem.timing
+  );
+}
+
+function validatePrescriptionId(
+  id: unknown
+): asserts id is string {
+  if (
+    typeof id !== "string" ||
+    !id.trim()
+  ) {
+    throw new Error(
+      "INVALID_PRESCRIPTION_ID"
+    );
+  }
+}
+
+function validateInstructions(
+  instructions: unknown
+) {
+  if (
+    instructions !== undefined &&
+    instructions !== null &&
+    typeof instructions !== "string"
+  ) {
+    throw new Error(
+      "INVALID_INSTRUCTIONS"
+    );
+  }
 }
 
 export async function createPrescription(
   input: CreatePrescriptionInput
 ) {
-  const encounter = await prisma.encounter.findUnique({
-    where: {
-      id: input.encounterId,
-    },
-  });
-
-  if (!encounter) {
-    throw new Error("ENCOUNTER_NOT_FOUND");
+  if (
+    typeof input.encounterId !== "string" ||
+    !input.encounterId.trim()
+  ) {
+    throw new Error(
+      "ENCOUNTER_NOT_FOUND"
+    );
   }
 
-  if (encounter.status === "CANCELLED") {
-    throw new Error("ENCOUNTER_CANCELLED");
+  if (
+    typeof input.prescribedById !==
+      "string" ||
+    !input.prescribedById.trim()
+  ) {
+    throw new Error(
+      "PRESCRIBER_NOT_FOUND"
+    );
   }
 
-  const doctor = await prisma.user.findUnique({
-    where: {
-      id: input.prescribedById,
-    },
-  });
-
-  if (!doctor) {
-    throw new Error("PRESCRIBER_NOT_FOUND");
+  if (
+    !Array.isArray(input.items) ||
+    input.items.length === 0
+  ) {
+    throw new Error(
+      "PRESCRIPTION_ITEMS_REQUIRED"
+    );
   }
 
-  if (!input.items || input.items.length === 0) {
-    throw new Error("PRESCRIPTION_ITEMS_REQUIRED");
-  }
+  validateInstructions(
+    input.instructions
+  );
 
-  for (const item of input.items) {
-    normalizeMedicineRoute(item.route);
-    normalizeMedicineTiming(item.timing);
+  const encounterId =
+    input.encounterId.trim();
 
-    const medicine = await prisma.medicine.findUnique({
+  const prescribedById =
+    input.prescribedById.trim();
+
+  const encounter =
+    await prisma.encounter.findUnique({
       where: {
-        id: item.medicineId,
+        id: encounterId,
+      },
+
+      select: {
+        id: true,
+        status: true,
       },
     });
 
-    if (!medicine) {
-      throw new Error("MEDICINE_NOT_FOUND");
-    }
+  if (!encounter) {
+    throw new Error(
+      "ENCOUNTER_NOT_FOUND"
+    );
   }
 
-  return prisma.$transaction(async (tx) => {
-    const prescription =
-      await tx.prescription.create({
+  if (
+    encounter.status === "CANCELLED"
+  ) {
+    throw new Error(
+      "ENCOUNTER_CANCELLED"
+    );
+  }
+
+  const prescriber =
+    await prisma.user.findUnique({
+      where: {
+        id: prescribedById,
+      },
+
+      select: {
+        id: true,
+      },
+    });
+
+  if (!prescriber) {
+    throw new Error(
+      "PRESCRIBER_NOT_FOUND"
+    );
+  }
+
+  const medicineIds = new Set<string>();
+
+  for (const item of input.items) {
+    validatePrescriptionItem(item);
+
+    const medicineId =
+      item.medicineId.trim();
+
+    if (medicineIds.has(medicineId)) {
+      throw new Error(
+        "DUPLICATE_MEDICINE"
+      );
+    }
+
+    medicineIds.add(medicineId);
+  }
+
+  const medicines =
+    await prisma.medicine.findMany({
+      where: {
+        id: {
+          in: [...medicineIds],
+        },
+      },
+
+      select: {
+        id: true,
+        isActive: true,
+      },
+    });
+
+  if (
+    medicines.length !==
+    medicineIds.size
+  ) {
+    throw new Error(
+      "MEDICINE_NOT_FOUND"
+    );
+  }
+
+  const inactiveMedicine =
+    medicines.find(
+      (medicine) =>
+        !medicine.isActive
+    );
+
+  if (inactiveMedicine) {
+    throw new Error(
+      "MEDICINE_INACTIVE"
+    );
+  }
+
+  return prisma.$transaction(
+    async (tx) => {
+      return tx.prescription.create({
         data: {
-          encounterId: input.encounterId,
-          prescribedById: input.prescribedById,
-          instructions: input.instructions?.trim(),
+          encounterId,
+
+          prescribedById,
+
+          instructions:
+            input.instructions === null
+              ? null
+              : input.instructions?.trim(),
+
           status: "ACTIVE",
 
           items: {
-            create: input.items.map((item) => ({
-              medicine: {
-                connect: { id: item.medicineId },
-              },
-              dosage: item.dosage.trim(),
-              frequency: item.frequency.trim(),
-              duration: item.duration.trim(),
-              route: normalizeMedicineRoute(
-                item.route
-              ),
-              timing: normalizeMedicineTiming(
-                item.timing
-              ),
-              quantity: item.quantity,
-              remarks: item.remarks?.trim(),
-            })),
+            create: input.items.map(
+              (item) => ({
+                medicine: {
+                  connect: {
+                    id: item.medicineId.trim(),
+                  },
+                },
+
+                dosage:
+                  item.dosage.trim(),
+
+                frequency:
+                  item.frequency.trim(),
+
+                duration:
+                  item.duration.trim(),
+
+                route:
+                  normalizeMedicineRoute(
+                    item.route
+                  ),
+
+                timing:
+                  normalizeMedicineTiming(
+                    item.timing
+                  ),
+
+                quantity:
+                  item.quantity,
+
+                remarks:
+                  item.remarks === null
+                    ? null
+                    : item.remarks?.trim(),
+              })
+            ),
           },
         },
 
         include: {
+          encounter: {
+            select: {
+              id: true,
+              encounterNumber: true,
+              patientId: true,
+              hospitalId: true,
+            },
+          },
+
+          prescribedBy: {
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+
           items: {
             include: {
               medicine: true,
@@ -208,9 +486,8 @@ export async function createPrescription(
           },
         },
       });
-
-    return prescription;
-  });
+    }
+  );
 }
 
 export async function getPrescriptions() {
@@ -243,10 +520,12 @@ export async function getPrescriptions() {
 export async function getPrescriptionById(
   id: string
 ) {
+  validatePrescriptionId(id);
+
   const prescription =
     await prisma.prescription.findUnique({
       where: {
-        id,
+        id: id.trim(),
       },
 
       include: {
@@ -270,7 +549,96 @@ export async function getPrescriptionById(
     });
 
   if (!prescription) {
-    throw new Error("PRESCRIPTION_NOT_FOUND");
+    throw new Error(
+      "PRESCRIPTION_NOT_FOUND"
+    );
+  }
+
+  return prescription;
+}
+
+export async function getPrescriptionPdfData(
+  id: string
+) {
+  validatePrescriptionId(id);
+
+  const prescription =
+    await prisma.prescription.findUnique({
+      where: {
+        id: id.trim(),
+      },
+
+      select: {
+        id: true,
+        status: true,
+        instructions: true,
+        createdAt: true,
+
+        encounter: {
+          select: {
+            id: true,
+            encounterNumber: true,
+
+            patient: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+
+            hospital: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+
+        prescribedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+
+        items: {
+          orderBy: {
+            createdAt: "asc",
+          },
+
+          select: {
+            id: true,
+            dosage: true,
+            frequency: true,
+            duration: true,
+            route: true,
+            timing: true,
+            quantity: true,
+            remarks: true,
+
+            medicine: {
+              select: {
+                id: true,
+                name: true,
+                genericName: true,
+                brandName: true,
+                strength: true,
+                dosageForm: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+  if (!prescription) {
+    throw new Error(
+      "PRESCRIPTION_NOT_FOUND"
+    );
   }
 
   return prescription;
@@ -280,10 +648,35 @@ export async function updatePrescription(
   id: string,
   input: UpdatePrescriptionInput
 ) {
+  validatePrescriptionId(id);
+
+  if (
+    !input ||
+    typeof input !== "object" ||
+    Array.isArray(input)
+  ) {
+    throw new Error(
+      "EMPTY_UPDATE"
+    );
+  }
+
+  if (
+    input.instructions === undefined &&
+    input.status === undefined
+  ) {
+    throw new Error(
+      "EMPTY_UPDATE"
+    );
+  }
+
+  validateInstructions(
+    input.instructions
+  );
+
   const prescription =
     await prisma.prescription.findUnique({
       where: {
-        id,
+        id: id.trim(),
       },
 
       include: {
@@ -292,26 +685,80 @@ export async function updatePrescription(
     });
 
   if (!prescription) {
-    throw new Error("PRESCRIPTION_NOT_FOUND");
+    throw new Error(
+      "PRESCRIPTION_NOT_FOUND"
+    );
   }
 
-  if (prescription.encounter.status === "CANCELLED") {
-    throw new Error("ENCOUNTER_CANCELLED");
+  if (
+    prescription.encounter.status ===
+    "CANCELLED"
+  ) {
+    throw new Error(
+      "ENCOUNTER_CANCELLED"
+    );
+  }
+
+  if (
+    prescription.status === "CANCELLED"
+  ) {
+    throw new Error(
+      "PRESCRIPTION_CANCELLED"
+    );
+  }
+
+  if (
+    prescription.status !== "ACTIVE"
+  ) {
+    throw new Error(
+      "PRESCRIPTION_NOT_ACTIVE"
+    );
+  }
+
+  if (
+    input.status !== undefined &&
+    input.status !== "CANCELLED"
+  ) {
+    throw new Error(
+      "INVALID_STATUS_TRANSITION"
+    );
   }
 
   return prisma.prescription.update({
     where: {
-      id,
+      id: id.trim(),
     },
 
     data: {
       instructions:
-        input.instructions?.trim(),
+        input.instructions === undefined
+          ? undefined
+          : input.instructions === null
+            ? null
+            : input.instructions.trim(),
 
       status: input.status,
     },
 
     include: {
+      encounter: {
+        select: {
+          id: true,
+          encounterNumber: true,
+          patientId: true,
+          hospitalId: true,
+        },
+      },
+
+      prescribedBy: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+
       items: {
         include: {
           medicine: true,

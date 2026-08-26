@@ -8,50 +8,85 @@ import {
   deleteTreatmentPlan,
 } from "./tp.service";
 
-type UpdateTreatmentPlanInput =
-  Parameters<typeof updateTreatmentPlan>[1];
-
 import { AuthRequest } from "../auth/auth.middleware";
 import { createAuditLog } from "../audit-log/aud.service";
+import { TreatmentPlanStatus } from "../../generated/prisma/browser";
+
+const TREATMENT_PLAN_STATUSES = Object.values(
+  TreatmentPlanStatus
+);
+
+function isValidTreatmentPlanStatus(
+  status: unknown
+): status is TreatmentPlanStatus {
+  return (
+    typeof status === "string" &&
+    TREATMENT_PLAN_STATUSES.includes(
+      status as TreatmentPlanStatus
+    )
+  );
+}
 
 export async function createTreatmentPlanController(
   req: AuthRequest,
   res: Response
 ) {
   try {
-    const { encounterId, title, description } =
-      req.body ?? {};
+    const body = req.body ?? {};
 
-    if (!encounterId) {
+    const { encounterId, title, description } = body;
+
+    if (
+      typeof encounterId !== "string" ||
+      !encounterId.trim()
+    ) {
       return res.status(400).json({
         success: false,
         message: "Encounter ID is required",
       });
     }
 
-    if (!title) {
+    if (
+      typeof title !== "string" ||
+      !title.trim()
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Treatment plan title is required",
+        message:
+          "Treatment plan title is required",
       });
     }
 
-    const treatmentPlan = await createTreatmentPlan({
-      encounterId,
-      title,
-      description,
-    });
+    if (
+      description !== undefined &&
+      typeof description !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Treatment plan description must be a string",
+      });
+    }
+
+    const treatmentPlan =
+      await createTreatmentPlan({
+        encounterId: encounterId.trim(),
+        title,
+        description,
+      });
 
     await createAuditLog({
       userId: req.user?.id,
-      hospitalId: treatmentPlan.encounter.hospitalId,
+      hospitalId:
+        treatmentPlan.encounter.hospitalId,
       action: "CREATE",
       entityType: "TREATMENT_PLAN",
       entityId: treatmentPlan.id,
       metadata: {
         encounterId: treatmentPlan.encounterId,
         title: treatmentPlan.title,
-        description: treatmentPlan.description,
+        description:
+          treatmentPlan.description,
         status: treatmentPlan.status,
       },
       ipAddress: req.ip,
@@ -60,18 +95,32 @@ export async function createTreatmentPlanController(
 
     return res.status(201).json({
       success: true,
-      message: "Treatment plan created successfully",
+      message:
+        "Treatment plan created successfully",
       data: treatmentPlan,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "ENCOUNTER_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Encounter not found",
-      });
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        "ENCOUNTER_NOT_FOUND"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Encounter not found",
+        });
+      }
+
+      if (
+        error.message ===
+        "ENCOUNTER_CANCELLED"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Cannot create treatment plan for a cancelled encounter",
+        });
+      }
     }
 
     console.error(
@@ -92,19 +141,33 @@ export async function getTreatmentPlansController(
 ) {
   try {
     const encounterId =
-      typeof req.query.encounterId === "string"
-        ? req.query.encounterId
+      typeof req.params.encounterId === "string"
+        ? req.params.encounterId.trim()
         : undefined;
 
-    const status =
+    const rawStatus =
       typeof req.query.status === "string"
-        ? req.query.status
+        ? req.query.status.trim()
         : undefined;
 
-    const treatmentPlans = await getTreatmentPlans(
-      encounterId,
-      status
-    );
+    let status: TreatmentPlanStatus | undefined;
+
+    if (rawStatus) {
+      if (!isValidTreatmentPlanStatus(rawStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid treatment plan status",
+        });
+      }
+
+      status = rawStatus;
+    }
+
+    const treatmentPlans =
+      await getTreatmentPlans(
+        encounterId,
+        status
+      );
 
     return res.status(200).json({
       success: true,
@@ -128,9 +191,10 @@ export async function getTreatmentPlanByIdController(
   res: Response
 ) {
   try {
-    const treatmentPlan = await getTreatmentPlanById(
-      req.params.id as string
-    );
+    const treatmentPlan =
+      await getTreatmentPlanById(
+        req.params.id as string
+      );
 
     return res.status(200).json({
       success: true,
@@ -139,7 +203,8 @@ export async function getTreatmentPlanByIdController(
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message === "TREATMENT_PLAN_NOT_FOUND"
+      error.message ===
+        "TREATMENT_PLAN_NOT_FOUND"
     ) {
       return res.status(404).json({
         success: false,
@@ -164,26 +229,80 @@ export async function updateTreatmentPlanController(
   res: Response
 ) {
   try {
-    const treatmentPlan = await updateTreatmentPlan(
-      req.params.id as string,
-      {
-        title: req.body?.title,
-        description: req.body?.description,
-        status: req.body?.status as
-          UpdateTreatmentPlanInput["status"],
-      }
-    );
+    const body = req.body ?? {};
+
+    const { title, description, status } = body;
+
+    if (
+      title === undefined &&
+      description === undefined &&
+      status === undefined
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "At least one field is required to update the treatment plan",
+      });
+    }
+
+    if (
+      title !== undefined &&
+      (
+        typeof title !== "string" ||
+        !title.trim()
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Treatment plan title cannot be empty",
+      });
+    }
+
+    if (
+      description !== undefined &&
+      description !== null &&
+      typeof description !== "string"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Treatment plan description must be a string or null",
+      });
+    }
+
+    if (
+      status !== undefined &&
+      !isValidTreatmentPlanStatus(status)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid treatment plan status",
+      });
+    }
+
+    const treatmentPlan =
+      await updateTreatmentPlan(
+        req.params.id as string,
+        {
+          title,
+          description,
+          status,
+        }
+      );
 
     await createAuditLog({
       userId: req.user?.id,
-      hospitalId: treatmentPlan.encounter.hospitalId,
+      hospitalId:
+        treatmentPlan.encounter.hospitalId,
       action: "UPDATE",
       entityType: "TREATMENT_PLAN",
       entityId: treatmentPlan.id,
       metadata: {
         encounterId: treatmentPlan.encounterId,
         title: treatmentPlan.title,
-        description: treatmentPlan.description,
+        description:
+          treatmentPlan.description,
         status: treatmentPlan.status,
       },
       ipAddress: req.ip,
@@ -192,18 +311,44 @@ export async function updateTreatmentPlanController(
 
     return res.status(200).json({
       success: true,
-      message: "Treatment plan updated successfully",
+      message:
+        "Treatment plan updated successfully",
       data: treatmentPlan,
     });
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === "TREATMENT_PLAN_NOT_FOUND"
-    ) {
-      return res.status(404).json({
-        success: false,
-        message: "Treatment plan not found",
-      });
+    if (error instanceof Error) {
+      if (
+        error.message ===
+        "TREATMENT_PLAN_NOT_FOUND"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Treatment plan not found",
+        });
+      }
+
+      if (
+        error.message ===
+        "ENCOUNTER_CANCELLED"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Cannot update treatment plan for a cancelled encounter",
+        });
+      }
+
+      if (
+        error.message ===
+        "INVALID_STATUS_TRANSITION"
+      ) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid treatment plan status transition",
+        });
+      }
     }
 
     console.error(
@@ -223,20 +368,23 @@ export async function deleteTreatmentPlanController(
   res: Response
 ) {
   try {
-    const treatmentPlan = await deleteTreatmentPlan(
-      req.params.id as string
-    );
+    const treatmentPlan =
+      await deleteTreatmentPlan(
+        req.params.id as string
+      );
 
     await createAuditLog({
       userId: req.user?.id,
-      hospitalId: treatmentPlan.encounter.hospitalId,
+      hospitalId:
+        treatmentPlan.encounter.hospitalId,
       action: "DELETE",
       entityType: "TREATMENT_PLAN",
       entityId: treatmentPlan.id,
       metadata: {
         encounterId: treatmentPlan.encounterId,
         title: treatmentPlan.title,
-        description: treatmentPlan.description,
+        description:
+          treatmentPlan.description,
         status: treatmentPlan.status,
       },
       ipAddress: req.ip,
@@ -245,13 +393,15 @@ export async function deleteTreatmentPlanController(
 
     return res.status(200).json({
       success: true,
-      message: "Treatment plan deleted successfully",
+      message:
+        "Treatment plan deleted successfully",
       data: treatmentPlan,
     });
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message === "TREATMENT_PLAN_NOT_FOUND"
+      error.message ===
+        "TREATMENT_PLAN_NOT_FOUND"
     ) {
       return res.status(404).json({
         success: false,

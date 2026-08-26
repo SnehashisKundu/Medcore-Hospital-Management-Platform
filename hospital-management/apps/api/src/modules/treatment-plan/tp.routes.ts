@@ -1,4 +1,5 @@
 import { Router } from "express";
+
 import { authenticate } from "../auth/auth.middleware";
 
 import {
@@ -11,7 +12,11 @@ import {
 
 const router = Router();
 
-router.post("/", authenticate, createTreatmentPlanController);
+router.post(
+  "/",
+  authenticate,
+  createTreatmentPlanController
+);
 
 router.get(
   "/encounter/:encounterId",
@@ -19,10 +24,22 @@ router.get(
   getTreatmentPlansController
 );
 
-router.get("/:id", authenticate, getTreatmentPlanByIdController);
+router.get(
+  "/:id",
+  authenticate,
+  getTreatmentPlanByIdController
+);
 
-router.put("/:id", authenticate, updateTreatmentPlanController);
+router.put(
+  "/:id",
+  authenticate,
+  updateTreatmentPlanController
+);
 
-router.delete("/:id", authenticate, deleteTreatmentPlanController);
+router.delete(
+  "/:id",
+  authenticate,
+  deleteTreatmentPlanController
+);
 
 export default router;

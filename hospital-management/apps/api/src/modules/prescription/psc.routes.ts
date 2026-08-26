@@ -4,6 +4,7 @@ import {
   createPrescriptionController,
   getPrescriptionsController,
   getPrescriptionByIdController,
+  downloadPrescriptionPdfController,
   updatePrescriptionController,
 } from "./psc.controller";
 
@@ -24,6 +25,18 @@ router.get(
   authenticate,
   requirePermission("PRESCRIPTION_READ"),
   getPrescriptionsController
+);
+
+/*
+ * IMPORTANT:
+ * Keep /:id/pdf BEFORE /:id
+ * Otherwise Express can treat "pdf" as the :id parameter
+ */
+router.get(
+  "/prescriptions/:id/pdf",
+  authenticate,
+  requirePermission("PRESCRIPTION_READ"),
+  downloadPrescriptionPdfController
 );
 
 router.get(

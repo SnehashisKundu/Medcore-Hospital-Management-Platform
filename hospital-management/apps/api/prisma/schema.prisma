@@ -297,6 +297,8 @@ model Doctor {
   qualification String?
   bio           String?
 
+  signatureUrl String?
+
   // Experience before joining our system/hospital.
   priorExperienceYears Int @default(0)
 

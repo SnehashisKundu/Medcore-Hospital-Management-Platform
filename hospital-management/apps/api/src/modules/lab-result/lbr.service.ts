@@ -29,10 +29,18 @@ export async function createLabResult(
       where: {
         id: input.diagnosticOrderItemId,
       },
+      include: {
+        diagnosticTest: true,
+      },
     });
 
   if (!orderItem) {
     throw new Error("DIAGNOSTIC_ORDER_ITEM_NOT_FOUND");
+  }
+
+  // Lab result can only be created for LAB tests
+  if (orderItem.diagnosticTest.category !== "LAB") {
+    throw new Error("DIAGNOSTIC_TEST_NOT_LAB");
   }
 
   const existingResult =
@@ -62,8 +70,11 @@ export async function createLabResult(
       data: {
         diagnosticOrderItemId:
           input.diagnosticOrderItemId,
+
         reportedById: input.reportedById,
+
         remarks: input.remarks?.trim(),
+
         reportedAt: input.reportedAt
           ? new Date(input.reportedAt)
           : new Date(),
@@ -71,12 +82,18 @@ export async function createLabResult(
         values: {
           create:
             input.values?.map((value) => ({
-              parameterName: value.parameterName.trim(),
+              parameterName:
+                value.parameterName.trim(),
+
               value: value.value.trim(),
+
               unit: value.unit?.trim(),
+
               referenceRange:
                 value.referenceRange?.trim(),
-              isAbnormal: value.isAbnormal ?? false,
+
+              isAbnormal:
+                value.isAbnormal ?? false,
             })) ?? [],
         },
       },
@@ -85,6 +102,7 @@ export async function createLabResult(
         diagnosticOrderItem: {
           include: {
             diagnosticTest: true,
+
             diagnosticOrder: {
               include: {
                 encounter: {
@@ -120,6 +138,7 @@ export async function getLabResults() {
       diagnosticOrderItem: {
         include: {
           diagnosticTest: true,
+
           diagnosticOrder: {
             include: {
               encounter: {

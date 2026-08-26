@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import fs from "fs";
 
 import {
   createDoctor,
@@ -6,6 +7,8 @@ import {
   getDoctorById,
   updateDoctor,
   deleteDoctor,
+  uploadDoctorSignature,
+  removeDoctorSignature,
 } from "./doc.service";
 
 import { AuthRequest } from "../auth/auth.middleware";
@@ -268,6 +271,157 @@ export async function deleteDoctorController(
     }
 
     console.error("Delete doctor error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}
+
+export async function uploadDoctorSignatureController(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    const doctorId =
+      req.params.id as string;
+
+    if (!doctorId || !doctorId.trim()) {
+      if (req.file) {
+        fs.unlink(
+          req.file.path,
+          () => {}
+        );
+      }
+
+      return res.status(400).json({
+        success: false,
+        message: "Doctor ID is required",
+      });
+    }
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Signature image is required",
+      });
+    }
+
+    const signatureUrl =
+      `/uploads/signatures/${req.file.filename}`;
+
+    const doctor =
+      await uploadDoctorSignature(
+        doctorId.trim(),
+        signatureUrl
+      );
+
+    await createAuditLog({
+      userId: req.user?.id,
+      action: "UPDATE",
+      entityType: "DOCTOR",
+      entityId: doctor.id,
+      metadata: {
+        action: "SIGNATURE_UPLOADED",
+        signatureUrl:
+          doctor.signatureUrl,
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Doctor signature uploaded successfully",
+      data: doctor,
+    });
+  } catch (error) {
+    if (req.file) {
+      fs.unlink(
+        req.file.path,
+        () => {}
+      );
+    }
+
+    if (
+      error instanceof Error &&
+      error.message === "DOCTOR_NOT_FOUND"
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Doctor not found",
+      });
+    }
+
+    console.error(
+      "Upload doctor signature error:",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+  }
+}
+
+export async function removeDoctorSignatureController(
+  req: AuthRequest,
+  res: Response
+) {
+  try {
+    const doctor =
+      await removeDoctorSignature(
+        req.params.id as string
+      );
+
+    await createAuditLog({
+      userId: req.user?.id,
+      action: "UPDATE",
+      entityType: "DOCTOR",
+      entityId: doctor.id,
+      metadata: {
+        action: "SIGNATURE_REMOVED",
+      },
+      ipAddress: req.ip,
+      userAgent: req.get("user-agent"),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message:
+        "Doctor signature removed successfully",
+      data: doctor,
+    });
+  } catch (error) {
+    if (error instanceof Error) {
+      if (
+        error.message === "DOCTOR_NOT_FOUND"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message: "Doctor not found",
+        });
+      }
+
+      if (
+        error.message === "SIGNATURE_NOT_FOUND"
+      ) {
+        return res.status(404).json({
+          success: false,
+          message:
+            "Doctor signature not found",
+        });
+      }
+    }
+
+    console.error(
+      "Remove doctor signature error:",
+      error
+    );
 
     return res.status(500).json({
       success: false,

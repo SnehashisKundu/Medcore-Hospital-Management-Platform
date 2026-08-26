@@ -1,4 +1,6 @@
 import { prisma } from "../../config/prisma";
+import fs from "fs";
+import path from "path";
 
 interface CreateDoctorInput {
   userId: string;
@@ -182,4 +184,126 @@ export async function deleteDoctor(id: string) {
       deletedAt: new Date(),
     },
   });
+}
+
+export async function uploadDoctorSignature(
+  doctorId: string,
+  signatureUrl: string
+) {
+  const doctor = await prisma.doctor.findFirst({
+    where: {
+      id: doctorId,
+      deletedAt: null,
+    },
+  });
+
+  if (!doctor) {
+    throw new Error("DOCTOR_NOT_FOUND");
+  }
+
+  const previousSignatureUrl =
+    doctor.signatureUrl;
+
+  const updatedDoctor =
+    await prisma.doctor.update({
+      where: {
+        id: doctorId,
+      },
+      data: {
+        signatureUrl,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+  if (
+    previousSignatureUrl &&
+    previousSignatureUrl !== signatureUrl
+  ) {
+    try {
+      const previousFilePath = path.join(
+        process.cwd(),
+        previousSignatureUrl.replace(/^\//, "")
+      );
+
+      if (fs.existsSync(previousFilePath)) {
+        fs.unlinkSync(previousFilePath);
+      }
+    } catch (error) {
+      console.error(
+        "Failed to delete previous doctor signature:",
+        error
+      );
+    }
+  }
+
+  return updatedDoctor;
+}
+
+export async function removeDoctorSignature(
+  doctorId: string
+) {
+  const doctor = await prisma.doctor.findFirst({
+    where: {
+      id: doctorId,
+      deletedAt: null,
+    },
+  });
+
+  if (!doctor) {
+    throw new Error("DOCTOR_NOT_FOUND");
+  }
+
+  if (!doctor.signatureUrl) {
+    throw new Error("SIGNATURE_NOT_FOUND");
+  }
+
+  const signatureUrl =
+    doctor.signatureUrl;
+
+  const updatedDoctor =
+    await prisma.doctor.update({
+      where: {
+        id: doctorId,
+      },
+      data: {
+        signatureUrl: null,
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+  try {
+    const filePath = path.join(
+      process.cwd(),
+      signatureUrl.replace(/^\//, "")
+    );
+
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+  } catch (error) {
+    console.error(
+      "Failed to delete doctor signature file:",
+      error
+    );
+  }
+
+  return updatedDoctor;
 }
