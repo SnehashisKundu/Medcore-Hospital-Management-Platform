@@ -2,14 +2,14 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 
-const signaturesDirectory = path.join(
+const uploadDirectory = path.join(
   process.cwd(),
   "uploads",
   "signatures"
 );
 
-if (!fs.existsSync(signaturesDirectory)) {
-  fs.mkdirSync(signaturesDirectory, {
+if (!fs.existsSync(uploadDirectory)) {
+  fs.mkdirSync(uploadDirectory, {
     recursive: true,
   });
 }
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
     _file,
     cb
   ) => {
-    cb(null, signaturesDirectory);
+    cb(null, uploadDirectory);
   },
 
   filename: (
@@ -28,39 +28,40 @@ const storage = multer.diskStorage({
     file,
     cb
   ) => {
-    const extension = path.extname(
-      file.originalname
-    ).toLowerCase();
+    const uniqueSuffix =
+      `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
 
-    const uniqueName =
-      `signature-${Date.now()}-${Math.round(
-        Math.random() * 1e9
-      )}${extension}`;
-
-    cb(null, uniqueName);
+    cb(
+      null,
+      `signature-${uniqueSuffix}${path.extname(
+        file.originalname
+      )}`
+    );
   },
 });
-
-const allowedMimeTypes = [
-  "image/png",
-  "image/jpeg",
-  "image/jpg",
-];
 
 const fileFilter: multer.Options["fileFilter"] = (
   _req,
   file,
   cb
 ) => {
-  if (!allowedMimeTypes.includes(file.mimetype)) {
-    return cb(
+  const allowedMimeTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+  ];
+
+  if (
+    allowedMimeTypes.includes(file.mimetype)
+  ) {
+    cb(null, true);
+  } else {
+    cb(
       new Error(
-        "Only PNG and JPEG signature images are allowed"
+        "Only JPG, JPEG, PNG and WEBP signature images are allowed"
       )
     );
   }
-
-  cb(null, true);
 };
 
 export const signatureUpload = multer({
@@ -70,3 +71,5 @@ export const signatureUpload = multer({
     fileSize: 2 * 1024 * 1024,
   },
 });
+
+export const uploadDoctorSignature = signatureUpload;

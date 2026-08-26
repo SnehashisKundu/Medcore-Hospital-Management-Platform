@@ -597,13 +597,21 @@ export async function getPrescriptionPdfData(
         },
 
         prescribedBy: {
-          select: {
-            id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+            select: {
+              id: true,
+              firstName: true,
+              lastName: true,
+              email: true,
+
+              doctor: {
+                select: {
+                  signatureUrl: true,
+                  qualification: true,
+                  medicalRegistrationNumber: true,
+                },
+              },
+            },
           },
-        },
 
         items: {
           orderBy: {

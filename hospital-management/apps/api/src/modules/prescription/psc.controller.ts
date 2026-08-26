@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { Request, Response } from "express";
 import PDFDocument from "pdfkit";
 
@@ -1181,48 +1183,60 @@ export async function downloadPrescriptionPdfController(
       ==========================
     */
 
-    doc
-      .save()
-      .moveTo(
-        right - 170,
-        y
-      )
-      .lineTo(
-        right,
-        y
-      )
-      .strokeColor("#9CA3AF")
-      .lineWidth(0.8)
-      .stroke()
-      .restore();
+    doc.moveDown(3);
 
-    doc
-      .font("Helvetica-Bold")
-      .fontSize(9)
-      .fillColor("#111827")
-      .text(
-        `Dr. ${doctorName}`,
-        right - 170,
-        y + 8,
-        {
-          width: 170,
-          align: "center",
-        }
+    const signatureUrl =
+      prescription.prescribedBy.doctor?.signatureUrl;
+
+    if (signatureUrl) {
+      const signaturePath = path.join(
+        process.cwd(),
+        signatureUrl
       );
 
-    doc
-      .font("Helvetica")
-      .fontSize(8)
-      .fillColor("#6B7280")
-      .text(
-        "Prescribing Doctor",
-        right - 170,
-        y + 23,
+      if (fs.existsSync(signaturePath)) {
+        doc.image(
+          signaturePath,
+          doc.page.width -
+            doc.page.margins.right -
+            150,
+          doc.y,
+          {
+            fit: [150, 70],
+            align: "right",
+          }
+        );
+
+        doc.moveDown(5);
+      } else {
+        doc.text("____________________", {
+          align: "right",
+        });
+      }
+    } else {
+      doc.text("____________________", {
+        align: "right",
+      });
+    }
+
+    doc.text(`Dr. ${doctorName}`, {
+      align: "right",
+    });
+
+    if (
+      prescription.prescribedBy.doctor?.qualification
+    ) {
+      doc.text(
+        prescription.prescribedBy.doctor.qualification,
         {
-          width: 170,
-          align: "center",
+          align: "right",
         }
       );
+    }
+
+    doc.text("Prescribing Doctor", {
+      align: "right",
+    });
 
     /*
       ==========================
