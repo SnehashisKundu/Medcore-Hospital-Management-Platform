@@ -1,4 +1,6 @@
 import { prisma } from "../../config/prisma";
+import { NotificationType } from "../../generated/prisma/client";
+import { sendPatientNotification } from "../notification/notification.service";
 
 interface CreateAppointmentInput {
   hospitalId: string;
@@ -265,27 +267,40 @@ export async function createAppointment(
     end
   );
 
-  return prisma.appointment.create({
-    data: {
-      hospitalId: input.hospitalId,
-      patientId: input.patientId,
-      doctorHospitalId: input.doctorHospitalId,
-      doctorDepartmentAssignmentId:
-        input.doctorDepartmentAssignmentId,
+  const appointment = await prisma.appointment.create({
+      data: {
+        hospitalId: input.hospitalId,
+        patientId: input.patientId,
+        doctorHospitalId: input.doctorHospitalId,
+        doctorDepartmentAssignmentId:
+          input.doctorDepartmentAssignmentId,
 
-      appointmentNumber:
-        input.appointmentNumber.trim(),
+        appointmentNumber:
+          input.appointmentNumber.trim(),
 
-      type: input.type ?? "OPD",
-      priority: input.priority ?? "NORMAL",
+        type: input.type ?? "OPD",
+        priority: input.priority ?? "NORMAL",
 
-      scheduledStart: start,
-      scheduledEnd: end,
+        scheduledStart: start,
+        scheduledEnd: end,
 
-      reason: input.reason?.trim(),
-      notes: input.notes?.trim(),
-    },
+        reason: input.reason?.trim(),
+        notes: input.notes?.trim(),
+      },
   });
+
+await sendPatientNotification({
+  patientId: appointment.patientId,
+  type: NotificationType.APPOINTMENT_BOOKED,
+  subject: "Appointment Booked",
+  message:
+    `Your appointment (${appointment.appointmentNumber}) ` +
+    `has been booked successfully.`,
+  referenceType: "APPOINTMENT",
+  referenceId: appointment.id,
+});
+
+return appointment;
 }
 
 export async function getAppointments() {

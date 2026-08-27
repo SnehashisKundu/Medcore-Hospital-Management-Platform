@@ -36,7 +36,7 @@ model Hospital {
 
   verifiedAt   DateTime?
   verifiedById String?
-  verifiedBy User? @relation("HospitalVerifiedBy", fields: [verifiedById], references: [id])
+  verifiedBy   User?     @relation("HospitalVerifiedBy", fields: [verifiedById], references: [id])
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -119,7 +119,7 @@ model User {
   firstName String
   lastName  String?
 
-  isActive Boolean @default(true)
+  isActive        Boolean @default(true)
   isEmailVerified Boolean @default(false)
 
   createdAt DateTime  @default(now())
@@ -150,7 +150,8 @@ model User {
   refreshTokens               RefreshToken[]
   passwordResetTokens         PasswordResetToken[]
   emailVerificationOtps       EmailVerificationOtp[]
-  verifiedHospitals           Hospital[] @relation("HospitalVerifiedBy")
+  verifiedHospitals           Hospital[]                 @relation("HospitalVerifiedBy")
+  notifications               Notification[]
 
   @@index([email])
   @@index([isActive])
@@ -159,7 +160,7 @@ model User {
 model EmailVerificationOtp {
   id String @id @default(uuid())
 
-  userId String
+  userId    String
   otpHash   String
   expiresAt DateTime
 
@@ -189,9 +190,9 @@ model RefreshToken {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  tokenHash String   @unique
+  tokenHash String    @unique
   expiresAt DateTime
   usedAt    DateTime?
 
@@ -464,6 +465,7 @@ model Patient {
   invoices          Invoice[]
   admissions        Admission[]
   allergies         PatientAllergy[]
+  notifications     Notification[]
 
   @@index([phone])
   @@index([email])
@@ -486,6 +488,64 @@ enum BloodGroup {
   AB_NEGATIVE
   O_POSITIVE
   O_NEGATIVE
+}
+
+enum NotificationType {
+  APPOINTMENT_BOOKED
+  PRESCRIPTION_CREATED
+  INVOICE_GENERATED
+  PAYMENT_COMPLETED
+  ADMISSION_CREATED
+  BED_ALLOCATED
+  LAB_RESULT_AVAILABLE
+  IMAGING_REPORT_AVAILABLE
+  DISCHARGE_SUMMARY_GENERATED
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model Notification {
+  id String @id @default(uuid())
+
+  patientId String
+  userId    String?
+
+  type NotificationType
+
+  subject String?
+  message String
+
+  referenceType String?
+  referenceId   String?
+
+  emailStatus NotificationStatus @default(PENDING)
+  smsStatus   NotificationStatus @default(PENDING)
+
+  emailError String?
+  smsError   String?
+
+  emailSentAt DateTime?
+  smsSentAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  patient Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([userId])
+  @@index([type])
+  @@index([referenceType])
+  @@index([referenceId])
+  @@index([emailStatus])
+  @@index([smsStatus])
+  @@index([createdAt])
 }
 
 model HospitalPatient {
