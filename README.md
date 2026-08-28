@@ -546,13 +546,6 @@ npx prisma studio
 -   Docker
 -   Git
 
-### Clone
-
-``` bash
-git clone https://github.com/SnehashisKundu/Medcore-Hospital-Management-Platform.git
-cd Medcore-Hospital-Management-Platform
-```
-
 ### Install Dependencies
 
 ``` bash
