@@ -1,48 +1,20 @@
 # MedCore Hospital Management Platform
 
-A secure, modular, and scalable **Hospital Management System backend** built to manage hospital operations, patient care, clinical workflows, IPD admission/discharge, pharmacy, diagnostics, procedures, billing, payments, authentication, RBAC, audit logging, and hospital location-based availability.
+A secure, modular, and scalable **Hospital Management System backend**
+built with Node.js, Express, TypeScript, Prisma, PostgreSQL, JWT/RBAC,
+Socket.IO, Redis, BullMQ, Twilio, and Docker.
 
-**Repository:** https://github.com/SnehashisKundu/Medcore-Hospital-Management-Platform
+**Repository:**
+https://github.com/SnehashisKundu/Medcore-Hospital-Management-Platform
 
----
+------------------------------------------------------------------------
 
-## Table of Contents
+## Project Overview
 
-1. Project Overview
-2. Key Features
-3. Technology Stack
-4. Architecture
-5. Project Structure
-6. Core Modules
-7. Authentication and Security
-8. RBAC
-9. Request Flow
-10. Clinical Workflows
-11. OPD Workflow
-12. IPD Workflow
-13. Pharmacy
-14. Diagnostics
-15. Procedures
-16. Billing and Payments
-17. Location and Availability
-18. Audit Logging
-19. Database and Prisma
-20. Setup
-21. Environment Variables
-22. Docker
-23. Testing
-24. Development Status
-25. Documentation
+MedCore models connected hospital workflows rather than isolated CRUD
+operations.
 
----
-
-# 1. Project Overview
-
-MedCore models the major operational and clinical workflows of a hospital. The system is not designed as isolated CRUD modules only; important entities are connected through practical workflows.
-
-Main patient journey:
-
-```text
+``` text
 Patient
   ↓
 Appointment
@@ -52,9 +24,23 @@ Encounter
 OPD or IPD Care
 ```
 
-IPD journey:
+### OPD Workflow
 
-```text
+``` text
+Appointment
+  ↓
+OPD Encounter
+  ↓
+Vitals → Clinical Notes → Diagnosis
+  ↓
+Prescription / Diagnostics / Procedures
+  ↓
+Billing → Payment
+```
+
+### IPD Workflow
+
+``` text
 IPD Appointment
   ↓
 Encounter
@@ -69,284 +55,179 @@ Billing / Payment
   ↓
 Discharge Summary
   ↓
-Bed Released
-  ↓
-Admission Discharged
-  ↓
-Encounter Completed
+Bed Released → Admission Discharged → Encounter Completed
 ```
 
----
+------------------------------------------------------------------------
 
-# 2. Key Features
+## Key Features
 
-- JWT authentication
-- Access and refresh token flow
-- Register, login, logout and current-user access
-- Change password
-- Forgot and reset password
-- Secure one-time password reset tokens
-- Role-Based Access Control
-- Roles, permissions, user roles and role permissions
-- Audit logging
-- Hospital and department management
-- Doctor, hospital and department assignments
-- Patient management
-- Appointments and encounters
-- Vitals, clinical notes and diagnoses
-- OPD and IPD workflows
-- Admission and discharge
-- Ward, room, bed and bed allocation
-- Medicine and medicine stock
-- Prescription and medicine dispensing
-- Diagnostic tests and diagnostic orders
-- Lab results and imaging reports
-- Procedures and procedure orders
-- Procedure staff assignment
-- Billing and payments
-- Hospital location support
-- Nearby hospital discovery
-- Bed availability checking
+-   JWT authentication with access and refresh tokens
+-   Register, login, logout, current user, password change and password
+    reset
+-   Role-Based Access Control with roles and permissions
+-   Audit logging
+-   Hospital and department management
+-   Doctor hospital and department assignments
+-   Doctor schedules, availability and leave validation
+-   Patient management
+-   Appointment management and conflict prevention
+-   Encounters, vitals, clinical notes and diagnoses
+-   OPD and IPD workflows
+-   Admissions and discharge summaries
+-   Ward, room, bed and bed allocation management
+-   Medicine, stock, prescriptions and medicine dispensing
+-   Diagnostic tests, orders, lab results and imaging reports
+-   Procedures, procedure orders and staff assignment
+-   Billing and payments
+-   Hospital location and availability support
+-   Database-backed notifications
+-   Email notifications
+-   Twilio SMS notifications
+-   Socket.IO real-time notifications
+-   Notification delivery status tracking
+-   Redis background infrastructure
+-   BullMQ delayed appointment reminders
+-   Appointment reminders at 24 hours and 1 hour before appointments
 
----
+------------------------------------------------------------------------
 
-# 3. Technology Stack
+## Technology Stack
 
-| Technology | Purpose |
-|---|---|
-| Node.js | Backend runtime |
-| Express.js | HTTP API framework |
-| TypeScript | Type-safe development |
-| PostgreSQL | Relational database |
-| Prisma ORM | Typed database access |
-| Prisma Migrate | Schema migrations |
-| JWT | Authentication |
-| Docker | Containerized development/infrastructure |
-| Postman | API testing |
+  Technology   Purpose
+  ------------ -----------------------------------
+  Node.js      Backend runtime
+  Express.js   HTTP API framework
+  TypeScript   Type-safe development
+  PostgreSQL   Relational database
+  Prisma ORM   Typed database access
+  JWT          Authentication and authorization
+  Socket.IO    Real-time notification events
+  Redis        Background job infrastructure
+  BullMQ       Delayed appointment reminder jobs
+  Nodemailer   Email notifications
+  Twilio       SMS notifications
+  Docker       Development infrastructure
+  Postman      API testing
 
----
+------------------------------------------------------------------------
 
-# 4. System Architecture
+## System Architecture
 
-```mermaid
-flowchart TD
-    A[Client / API Consumer] --> B[Express Routes]
-    B --> C[Authentication Middleware]
-    C --> D[Authorization / RBAC]
-    D --> E[Controller]
-    E --> F[Service Layer]
-    F --> G[Prisma ORM]
-    G --> H[(PostgreSQL)]
-    F --> I[Audit Log]
-    I --> H
+``` text
+Client / API Consumer
+        ↓
+   Express Routes
+        ↓
+Authentication Middleware
+        ↓
+Authorization / RBAC
+        ↓
+    Controller
+        ↓
+   Service Layer
+        ↓
+    Prisma ORM
+        ↓
+    PostgreSQL
+
+Important events
+        ↓
+Audit Log / Notification Service
+        ├── Email
+        ├── Twilio SMS
+        └── Socket.IO
+
+Appointment reminders
+        ↓
+BullMQ Queue
+        ↓
+Redis
+        ↓
+Delayed Job
+        ↓
+Reminder Worker
+        ↓
+Notification Service
 ```
 
-### Routes
-Define endpoints and connect requests to controllers.
+------------------------------------------------------------------------
 
-### Middleware
-Handles shared request concerns such as authentication and authorization.
+## Project Structure
 
-### Controllers
-Handle HTTP input/output and call the service layer.
-
-### Services
-Contain business rules, workflow validation, relationship checks, database operations, and audit actions.
-
-### Prisma
-Provides typed access to PostgreSQL and manages schema-driven database operations.
-
----
-
-# 5. Project Structure
-
-```text
+``` text
 apps/api/src
 │
+├── app.ts
+├── server.ts
+│
 ├── config
-├── controllers
-├── generated
+│   ├── prisma.ts
+│   ├── redis.ts
+│   └── socket.ts
+│
 ├── middleware
+│   └── permission.middleware.ts
+│
 └── modules
-    ├── admission
     ├── appointment
+    ├── appointment-reminder
+    │   ├── reminder.queue.ts
+    │   └── reminder.worker.ts
     ├── audit-log
     ├── auth
+    ├── notification
+    ├── patient
+    ├── doctor
+    ├── hospital
+    ├── department
+    ├── encounter
+    ├── admission
+    ├── discharge-summary
+    ├── ward
+    ├── room
     ├── bed
     ├── bed-allocation
-    ├── billing
-    ├── clinical-note
-    ├── department
-    ├── diagnosis
-    ├── diagnostic-order
-    ├── diagnostictest
-    ├── discharge-summary
-    ├── doctor
-    ├── doctorDepartmentAssignment
-    ├── doctorHospital
-    ├── encounter
-    ├── hospital
-    ├── hospital-procedure
-    ├── imaging-report
-    ├── lab-result
     ├── medicine
-    ├── medicine-dispense
     ├── medicine-stock
-    ├── patient
-    ├── payment
-    ├── permission
     ├── prescription
+    ├── medicine-dispense
+    ├── diagnostictest
+    ├── diagnostic-order
+    ├── lab-result
+    ├── imaging-report
     ├── procedure
     ├── procedure-order
     ├── procedure-staff-assignment
+    ├── billing
+    ├── payment
     ├── role
-    ├── role-permission
-    ├── room
-    ├── specialization
-    ├── user-role
-    ├── vitals
-    └── ward
+    ├── permission
+    └── user-role
 ```
 
 Most modules follow:
 
-```text
+``` text
 module/
 ├── <module>.service.ts
 ├── <module>.controller.ts
 └── <module>.routes.ts
 ```
 
----
+------------------------------------------------------------------------
 
-# 6. Core Modules
-
-## Authentication and Access
-- Auth
-- Role
-- Permission
-- Role Permission
-- User Role
-- Audit Log
-
-## Hospital Infrastructure
-- Hospital
-- Department
-- Ward
-- Room
-- Bed
-- Bed Allocation
-
-## Doctor Management
-- Doctor
-- Doctor Hospital
-- Doctor Department Assignment
-- Specialization
-
-## Patient and Clinical Care
-- Patient
-- Appointment
-- Encounter
-- Vitals
-- Clinical Note
-- Diagnosis
-
-## IPD
-- Admission
-- Bed Allocation
-- Discharge Summary
-
-## Pharmacy
-- Medicine
-- Medicine Stock
-- Prescription
-- Medicine Dispense
-
-## Diagnostics
-- Diagnostic Test
-- Diagnostic Order
-- Lab Result
-- Imaging Report
-
-## Procedures
-- Procedure
-- Hospital Procedure
-- Procedure Order
-- Procedure Staff Assignment
-
-## Finance
-- Billing
-- Payment
-
----
-
-# 7. Authentication and Security
-
-The authentication module supports:
-
-```text
-Register
-Login
-Refresh Token
-Logout
-Get Current User
-Change Password
-Forgot Password
-Reset Password
-```
+## Authentication and RBAC
 
 Protected requests use:
 
-```text
+``` text
 Authorization: Bearer <accessToken>
 ```
 
-Login flow:
+Authorization hierarchy:
 
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant API as Auth API
-    participant DB as Database
-
-    U->>API: Login with credentials
-    API->>DB: Find user
-    DB-->>API: User data
-    API->>API: Verify password
-    API->>API: Generate access token
-    API->>API: Generate refresh token
-    API-->>U: Tokens and user data
-```
-
-Password recovery flow:
-
-```text
-Forgot Password
-    ↓
-Check Active Account
-    ↓
-Generate Secure Reset Token
-    ↓
-Store Token Hash
-    ↓
-Reset Password Request
-    ↓
-Validate Token and Expiry
-    ↓
-Set New Password
-    ↓
-Revoke Existing Refresh Sessions
-```
-
-Reset tokens are designed for one-time use and are invalid after use.
-
----
-
-# 8. Role-Based Access Control
-
-Authorization is based on:
-
-```text
+``` text
 User
   ↓
 User Role
@@ -358,436 +239,224 @@ Role Permission
 Permission
 ```
 
-Request security flow:
+Authentication determines **who the user is**.\
+Authorization determines **what the user can do**.
 
-```mermaid
-flowchart TD
-    A[Incoming Request] --> B[JWT Authentication]
-    B --> C{Valid Token?}
-    C -->|No| D[401 Unauthorized]
-    C -->|Yes| E[Authenticated User]
-    E --> F[Role / Permission Check]
-    F --> G{Authorized?}
-    G -->|No| H[403 Forbidden]
-    G -->|Yes| I[Controller]
-    I --> J[Service]
-    J --> K[(Database)]
+------------------------------------------------------------------------
+
+## Notifications and Real-Time Events
+
+Notification delivery statuses:
+
+``` text
+PENDING
+SENT
+FAILED
+SKIPPED
 ```
 
-Authentication answers **who is making the request**. Authorization answers **what that user is allowed to do**.
+Flow:
 
----
-
-# 9. Main Request Flow
-
-```text
-HTTP Request
-     ↓
-Express Route
-     ↓
-Authentication Middleware
-     ↓
-Authorization / RBAC
-     ↓
-Controller
-     ↓
-Service
-     ↓
-Prisma ORM
-     ↓
-PostgreSQL
-     ↓
-HTTP Response
-```
-
-For important mutations:
-
-```text
-Create / Update / Delete / Workflow Action
-                  ↓
-             Business Logic
-                  ↓
-           Database Mutation
-                  ↓
-             Audit Log
-```
-
----
-
-# 10. Patient and Clinical Workflow
-
-The main patient flow:
-
-```mermaid
-flowchart TD
-    A[Patient] --> B[Appointment]
-    B --> C[Encounter]
-    C --> D{Consultation Type}
-    D -->|OPD| E[Clinical Care]
-    D -->|IPD| F[Admission]
-
-    E --> G[Vitals]
-    E --> H[Clinical Notes]
-    E --> I[Diagnosis]
-
-    F --> J[Bed Allocation]
-    J --> K[Inpatient Treatment]
-
-    G --> L[Prescription / Diagnostics / Procedures]
-    H --> L
-    I --> L
-    K --> L
-
-    L --> M[Billing]
-    M --> N[Payment]
-```
-
-Clinical modules are centered around the encounter:
-
-```text
-Encounter
-  ├── Vitals
-  ├── Clinical Notes
-  ├── Diagnosis
-  ├── Prescription
-  ├── Diagnostic Orders
-  └── Procedure Orders
-```
-
----
-
-# 11. OPD Workflow
-
-```mermaid
-flowchart TD
-    A[Patient] --> B[Appointment]
-    B --> C[Doctor Assignment Context]
-    C --> D[OPD Encounter]
-    D --> E[Vitals]
-    E --> F[Clinical Notes]
-    F --> G[Diagnosis]
-
-    G --> H[Prescription]
-    G --> I[Diagnostic Order]
-    G --> J[Procedure Order]
-
-    H --> K[Medicine Dispense]
-    I --> L[Lab Result or Imaging Report]
-    J --> M[Procedure Processing]
-
-    K --> N[Billing]
-    L --> N
-    M --> N
-    N --> O[Payment]
-```
-
----
-
-# 12. IPD Workflow
-
-```mermaid
-flowchart TD
-    A[Patient] --> B[IPD Appointment]
-    B --> C[IPD Encounter]
-    C --> D[Admission]
-    D --> E[Find Available Bed]
-    E --> F[Bed Allocation]
-    F --> G[Bed Occupied]
-    G --> H[Inpatient Treatment]
-
-    H --> I[Vitals]
-    H --> J[Clinical Notes]
-    H --> K[Diagnosis]
-    H --> L[Prescription]
-    H --> M[Diagnostics]
-    H --> N[Procedures]
-
-    I --> O[Billing]
-    J --> O
-    K --> O
-    L --> O
-    M --> O
-    N --> O
-
-    O --> P[Payment]
-    P --> Q[Discharge Summary]
-
-    Q --> R[Release Bed]
-    R --> S[Bed Available]
-
-    Q --> T[Admission Discharged]
-    Q --> U[Encounter Completed]
-```
-
-### Tested End-to-End IPD Flow
-
-```text
-Appointment
-    ↓
-IPD Encounter
-    ↓
-Admission
-    ↓
-Bed Allocation
-    ↓
-Bed Occupied
-    ↓
-Patient Discharge
-    ↓
-Bed Released / Available
-    ↓
-Admission Discharged
-    ↓
-Encounter Completed
-```
-
----
-
-# 13. Bed Management
-
-Infrastructure hierarchy:
-
-```text
-Hospital
-  ↓
-Ward
-  ↓
-Room
-  ↓
-Bed
-```
-
-Allocation lifecycle:
-
-```text
-Active Admission
+``` text
+Business Event
       ↓
-Select Available Bed
+Notification Service
       ↓
-Create Bed Allocation
-      ↓
-Patient Occupies Bed
-      ↓
-Discharge
-      ↓
-Release Allocation
-      ↓
-Bed Available Again
+Create Notification Record
+      ├── Email → SENT / FAILED
+      ├── Twilio SMS → SENT / FAILED
+      └── Socket.IO
+              ↓
+      notification:new
+              ↓
+      Connected Client
 ```
 
----
+### Twilio SMS
 
-# 14. Pharmacy Workflow
+The project uses:
 
-Modules:
-
-- Medicine
-- Medicine Stock
-- Prescription
-- Medicine Dispense
-
-```mermaid
-flowchart TD
-    A[Clinical Workflow] --> B[Prescription]
-    B --> C[Medicine]
-    C --> D[Medicine Stock Check]
-    D --> E{Stock Available?}
-    E -->|Yes| F[Medicine Dispense]
-    E -->|No| G[Availability / Stock Handling]
-    F --> H[Dispense Record]
+``` text
+TWILIO_ACCOUNT_SID
+TWILIO_AUTH_TOKEN
+TWILIO_PHONE_NUMBER
 ```
 
----
+Real Twilio SMS delivery was successfully tested.
 
-# 15. Diagnostics Workflow
+### Socket.IO
 
-```text
-Diagnostic Test
-      ↓
-Diagnostic Order
-      ↓
-Test Processing
-      ├── Lab Result
-      └── Imaging Report
+Socket.IO runs on the same HTTP server as the Express API.
+
+Current event:
+
+``` text
+notification:new
 ```
 
-```mermaid
-flowchart TD
-    A[Clinical Encounter] --> B[Diagnostic Order]
-    B --> C[Diagnostic Test]
-    C --> D{Result Type}
-    D -->|Laboratory| E[Lab Result]
-    D -->|Imaging| F[Imaging Report]
+A Socket.IO client successfully received real-time notification events
+during testing.
+
+------------------------------------------------------------------------
+
+## Appointment Reminders
+
+Appointment reminders use Redis and BullMQ.
+
+Reminders are scheduled for:
+
+``` text
+24 hours before the appointment
+1 hour before the appointment
 ```
 
----
+Flow:
 
-# 16. Procedure Workflow
-
-```text
-Procedure
-    ↓
-Hospital Procedure Availability
-    ↓
-Procedure Order
-    ↓
-Procedure Staff Assignment
-    ↓
-Procedure Processing
+``` text
+Appointment Created
+        ↓
+Schedule Reminder Jobs
+        ├── 24_HOURS
+        └── 1_HOUR
+        ↓
+BullMQ Queue
+        ↓
+Redis
+        ↓
+Delayed Job
+        ↓
+Reminder Worker
+        ↓
+APPOINTMENT_REMINDER
+        ↓
+Notification Service
+        ├── Email
+        ├── SMS
+        └── Socket.IO
 ```
 
----
+Reminder jobs use deterministic IDs based on:
 
-# 17. Billing and Payment Workflow
-
-```mermaid
-flowchart LR
-    A[Clinical Services / Treatment] --> B[Billing]
-    B --> C[Bill Created]
-    C --> D[Payment]
-    D --> E[Payment Recorded]
+``` text
+appointmentId-reminderType
 ```
 
----
+This supports targeted lookup and cancellation.
 
-# 18. Hospital Location and Availability
+------------------------------------------------------------------------
 
-```mermaid
-flowchart TD
-    A[User Location] --> B[Latitude and Longitude]
-    B --> C[Hospital Location Data]
-    C --> D[Calculate Nearby Hospitals]
-    D --> E[Sort by Distance]
-    E --> F[Check Bed Availability]
-    F --> G[Nearest Suitable Hospitals]
-```
-
-The goal is to support hospital discovery based on proximity and available capacity.
-
----
-
-# 19. Audit Logging
-
-Audit logging provides traceability for important system activity.
-
-```mermaid
-flowchart TD
-    A[Authenticated Action] --> B[Controller]
-    B --> C[Service]
-    C --> D[Database Mutation]
-    D --> E[Create Audit Log]
-    E --> F[(Audit Log Storage)]
-```
-
-Auditable actions include important create, update, delete, and workflow state changes.
-
----
-
-# 20. Database and Prisma
-
-Data access flow:
-
-```text
-Service
-   ↓
-Prisma Client
-   ↓
-Prisma Schema
-   ↓
-PostgreSQL
-```
-
-Prisma is used for:
-
-- Schema validation
-- Client generation
-- Migrations
-- Typed database access
+## Database and Prisma
 
 Useful commands:
 
-### Generate Client
+### Generate Prisma Client
 
-```bash
+``` bash
 npx prisma generate
 ```
 
-### Create and Apply Development Migration
+### Create and Apply Migration
 
-```bash
+``` bash
 npx prisma migrate dev
 ```
 
 ### Validate Schema
 
-```bash
+``` bash
 npx prisma validate
 ```
 
 ### Open Prisma Studio
 
-```bash
+``` bash
 npx prisma studio
 ```
 
----
+------------------------------------------------------------------------
 
-# 21. Getting Started
+## Getting Started
 
-## Prerequisites
+### Prerequisites
 
-Install:
+-   Node.js
+-   npm
+-   Docker
+-   Git
 
-- Node.js
-- npm
-- PostgreSQL
-- Docker, if using the project's containerized setup
-- Git
+### Clone
 
-## Clone
-
-```bash
+``` bash
 git clone https://github.com/SnehashisKundu/Medcore-Hospital-Management-Platform.git
 cd Medcore-Hospital-Management-Platform
 ```
 
-## Install Dependencies
+### Install Dependencies
 
-Run from the correct project/package directory:
-
-```bash
+``` bash
+cd apps/api
 npm install
 ```
 
-If using the monorepo structure, run commands according to the repository's workspace configuration.
+### Start Infrastructure
 
----
-
-# 22. Environment Variables
-
-Create the required environment file according to the project configuration.
-
-Typical examples:
-
-```env
-DATABASE_URL=
-JWT_SECRET=
-JWT_EXPIRES_IN=
+``` bash
+docker compose up -d
 ```
 
-Use the exact variable names required by the existing application configuration.
+### Run Prisma Migration
 
-Never commit:
+``` bash
+npx prisma migrate dev
+```
 
-- Real passwords
-- Production credentials
-- Private API keys
-- Real JWT secrets
-- Real database URLs containing credentials
+### Generate Prisma Client
 
-Recommended `.gitignore` entries:
+``` bash
+npx prisma generate
+```
 
-```gitignore
+### Start the API
+
+``` bash
+npm run dev
+```
+
+Socket.IO runs on the same HTTP server.
+
+------------------------------------------------------------------------
+
+## Environment Variables
+
+Create an `.env` file:
+
+``` env
+PORT=3000
+
+DATABASE_URL=
+
+JWT_SECRET=
+JWT_EXPIRES_IN=
+
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_PHONE_NUMBER=
+
+EMAIL_HOST=
+EMAIL_PORT=
+EMAIL_USER=
+EMAIL_PASSWORD=
+```
+
+Never commit real credentials, secrets, API keys, or production database
+URLs.
+
+Recommended `.gitignore`:
+
+``` gitignore
 node_modules/
 .env
 .env.*
@@ -796,167 +465,174 @@ coverage/
 *.log
 ```
 
----
+------------------------------------------------------------------------
 
-# 23. Docker
+## Docker
 
-Docker can be used for supporting infrastructure such as PostgreSQL.
+Docker provides supporting infrastructure such as PostgreSQL and Redis
+when configured in `docker-compose.yml`.
 
-```text
-Docker
-   ↓
-PostgreSQL Container
-   ↓
-DATABASE_URL
-   ↓
-Prisma
-   ↓
-Express API
+``` bash
+docker compose up -d
+docker ps
+docker compose down
 ```
 
-Use the repository's existing Docker configuration for exact service commands.
+------------------------------------------------------------------------
 
----
+## Testing
 
-# 24. API Testing
+Testing performed with Postman and direct integration checks:
 
-APIs were tested using Postman during development.
+-   Authentication and protected endpoints
+-   RBAC behavior
+-   CRUD operations
+-   Validation and error cases
+-   Doctor assignments and schedule validation
+-   Appointment conflict validation
+-   Admission and bed allocation lifecycle
+-   Bed release and discharge lifecycle
+-   Password and token flows
+-   Audit logging
+-   Notification creation and status tracking
+-   Real Twilio SMS delivery
+-   Socket.IO real-time notification delivery
+-   Redis connectivity
+-   BullMQ delayed reminder processing
+-   Appointment reminder worker processing
 
-Testing covered:
+### Recent Integration Results
 
-- Authentication
-- Protected endpoints
-- RBAC behavior
-- CRUD operations
-- Validation and error cases
-- Workflow transitions
-- Hospital relationships
-- Doctor assignments
-- Admission lifecycle
-- Bed allocation
-- Bed release
-- Discharge lifecycle
-- Password change
-- Forgot password
-- Reset password
-- Refresh token flow
-- Audit behavior
+-   [x] Twilio SMS successfully received on a real device
+-   [x] Socket.IO client received `notification:new`
+-   [x] BullMQ reminder jobs scheduled and processed through Redis
+-   [x] Reminder worker reached the notification flow
+-   [x] `APPOINTMENT_REMINDER` added to Prisma `NotificationType` and
+    migrated
+-   [x] 24-hour reminder scheduling implemented
+-   [x] 1-hour reminder scheduling implemented
 
-The major modules were tested individually and important connected workflows were tested end-to-end.
+------------------------------------------------------------------------
 
----
+## Implemented Modules
 
-# 25. Implemented Module Checklist
+### Authentication and Access
 
-## Authentication and Access
-- [x] Auth
-- [x] Role
-- [x] Permission
-- [x] Role Permission
-- [x] User Role
-- [x] Audit Log
+-   [x] Auth
+-   [x] Role
+-   [x] Permission
+-   [x] Role Permission
+-   [x] User Role
+-   [x] Audit Log
 
-## Hospital Infrastructure
-- [x] Hospital
-- [x] Department
-- [x] Ward
-- [x] Room
-- [x] Bed
-- [x] Bed Allocation
+### Hospital Infrastructure
 
-## Doctor Management
-- [x] Doctor
-- [x] Doctor Hospital
-- [x] Doctor Department Assignment
-- [x] Specialization
+-   [x] Hospital
+-   [x] Department
+-   [x] Ward
+-   [x] Room
+-   [x] Bed
+-   [x] Bed Allocation
 
-## Patient and Clinical Care
-- [x] Patient
-- [x] Appointment
-- [x] Encounter
-- [x] Vitals
-- [x] Clinical Note
-- [x] Diagnosis
+### Doctor Management
 
-## IPD
-- [x] Admission
-- [x] Discharge Summary
+-   [x] Doctor
+-   [x] Doctor Hospital
+-   [x] Doctor Department Assignment
+-   [x] Specialization
 
-## Pharmacy
-- [x] Medicine
-- [x] Medicine Stock
-- [x] Prescription
-- [x] Medicine Dispense
+### Patient and Clinical Care
 
-## Diagnostics
-- [x] Diagnostic Test
-- [x] Diagnostic Order
-- [x] Lab Result
-- [x] Imaging Report
+-   [x] Patient
+-   [x] Appointment
+-   [x] Encounter
+-   [x] Vitals
+-   [x] Clinical Note
+-   [x] Diagnosis
 
-## Procedures
-- [x] Procedure
-- [x] Hospital Procedure
-- [x] Procedure Order
-- [x] Procedure Staff Assignment
+### IPD
 
-## Finance
-- [x] Billing
-- [x] Payment
+-   [x] Admission
+-   [x] Discharge Summary
 
----
+### Pharmacy
 
-# 26. Documentation
+-   [x] Medicine
+-   [x] Medicine Stock
+-   [x] Prescription
+-   [x] Medicine Dispense
 
-The repository documentation can be organized as:
+### Diagnostics
 
-```text
-README.md
-Flow Chart.md
-Hospital data.md
-MedCore Ecosystem.txt
+-   [x] Diagnostic Test
+-   [x] Diagnostic Order
+-   [x] Lab Result
+-   [x] Imaging Report
+
+### Procedures
+
+-   [x] Procedure
+-   [x] Hospital Procedure
+-   [x] Procedure Order
+-   [x] Procedure Staff Assignment
+
+### Finance
+
+-   [x] Billing
+-   [x] Payment
+
+### Notifications and Background Processing
+
+-   [x] Database-backed Notification System
+-   [x] Email Notification Integration
+-   [x] Twilio SMS Integration
+-   [x] Socket.IO Real-Time Notifications
+-   [x] Redis Integration
+-   [x] BullMQ Appointment Reminder Queue
+-   [x] Appointment Reminder Worker
+-   [x] 24-Hour Appointment Reminder
+-   [x] 1-Hour Appointment Reminder
+-   [x] `APPOINTMENT_REMINDER` Notification Type
+
+------------------------------------------------------------------------
+
+## Development Status
+
+``` text
+Authentication and Security          COMPLETE
+RBAC                                COMPLETE
+Hospital Management                 COMPLETE
+Patient Management                  COMPLETE
+Clinical Modules                    COMPLETE
+Appointment Management              COMPLETE
+IPD Workflow                        COMPLETE
+Bed Management                      COMPLETE
+Pharmacy                            COMPLETE
+Diagnostics                         COMPLETE
+Procedures                          COMPLETE
+Billing and Payments                COMPLETE
+Audit Logging                       COMPLETE
+Location and Availability           COMPLETE
+
+Notification System                 COMPLETE
+Twilio SMS Integration              TESTED
+Socket.IO Real-Time Events          TESTED
+Redis Infrastructure                COMPLETE
+BullMQ Reminder Queue               COMPLETE
+Appointment Reminder Worker         COMPLETE
+24-Hour Reminder Scheduling         COMPLETE
+1-Hour Reminder Scheduling          COMPLETE
+
+API Testing                         COMPLETED
+Workflow Testing                    COMPLETED
+Prisma Migration and Generate       COMPLETED
 ```
 
-### README.md
-Main entry point for developers and reviewers. Covers architecture, setup, modules, workflows, security, and testing.
+------------------------------------------------------------------------
 
-### Flow Chart.md
-Detailed visual system and workflow diagrams.
+## Final System Summary
 
-### Hospital data.md
-Recommended for documenting entities, relationships, ownership rules, and important data dependencies.
-
-### MedCore Ecosystem.txt
-Quick high-level ecosystem view of the platform.
-
----
-
-# 27. Development Status
-
-```text
-Authentication and Security      COMPLETE
-RBAC                            COMPLETE
-Hospital Management             COMPLETE
-Patient Management              COMPLETE
-Clinical Modules                COMPLETE
-IPD Workflow                    COMPLETE
-Bed Management                  COMPLETE
-Pharmacy                        COMPLETE
-Diagnostics                     COMPLETE
-Procedures                      COMPLETE
-Billing and Payments            COMPLETE
-Audit Logging                   COMPLETE
-Location and Availability       COMPLETE
-API Testing                     COMPLETED
-Workflow Testing                COMPLETED
-Prisma Migration and Generate   COMPLETED
-```
-
----
-
-# Final System Summary
-
-```text
+``` text
 AUTHENTICATION
     ↓
 RBAC
@@ -966,49 +642,38 @@ HOSPITAL CONTEXT
 PATIENT
     ↓
 APPOINTMENT
+    ├── Appointment Booked Notification
+    │       ├── Email
+    │       ├── Twilio SMS
+    │       └── Socket.IO
+    │
+    └── Appointment Reminders
+            ├── 24 Hours Before
+            └── 1 Hour Before
+                    ↓
+                  Redis
+                    ↓
+                 BullMQ
+                    ↓
+             Reminder Worker
+                    ↓
+              Notification Service
+
+APPOINTMENT
     ↓
 ENCOUNTER
-    ├──────────── OPD ────────────┐
-    │                             │
-    │                      Clinical Care
-    │                             │
-    └──────────── IPD ────────────┤
-                                  ↓
-                              Admission
-                                  ↓
-                           Bed Allocation
-                                  ↓
-                            Patient Care
-                                  ↓
-             ┌────────────────────┼────────────────────┐
-             ↓                    ↓                    ↓
-         Pharmacy            Diagnostics          Procedures
-             └────────────────────┼────────────────────┘
-                                  ↓
-                               Billing
-                                  ↓
-                               Payment
-                                  ↓
-                       Discharge / Completion
-                                  ↓
-                               Audit Log
+    ├── OPD → Clinical Care
+    └── IPD → Admission → Bed Allocation → Patient Care
+                    ↓
+      Pharmacy / Diagnostics / Procedures
+                    ↓
+                  Billing
+                    ↓
+                  Payment
+                    ↓
+           Discharge / Completion
 ```
 
----
+------------------------------------------------------------------------
 
-## Built For
-
-MedCore is designed around:
-
-- Modularity
-- Maintainability
-- Security
-- Traceability
-- Workflow consistency
-- Clear domain separation
-- Scalable backend organization
-
----
-
-**MedCore Hospital Management Platform**  
-A modular backend for hospital operations, patient care, security, and connected clinical workflows.
+**Built as part of the MedCore Hospital Management Platform project.**

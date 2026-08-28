@@ -44,6 +44,9 @@ import doctorScheduleRoutes from "./modules/doctor-schedule/ds.routes";
 import doctorLeaveRoutes from "./modules/doctor-leave/dl.routes";
 import treatmentPlanRoutes from "./modules/treatment-plan/tp.routes";
 import allergyRoutes from "./modules/allergy/alg.routes";
+import medicationHistoryRoutes from "./modules/medication-history/mth.routes";
+import vaccinationRoutes from "./modules/vaccination/vac.routes";
+import familyHistoryRoutes from "./modules/family-history/fh.routes";
 
 const app = express();
 
@@ -107,5 +110,8 @@ app.use("/api/v1/doctor-schedules", doctorScheduleRoutes);
 app.use("/api/v1/doctor-leaves", doctorLeaveRoutes);
 app.use("/api/v1/treatment-plans", treatmentPlanRoutes);
 app.use("/api/v1", allergyRoutes);
+app.use("/api/v1", medicationHistoryRoutes);
+app.use("/api/v1", vaccinationRoutes);
+app.use("/api/v1", familyHistoryRoutes);
 
 export default app;

@@ -1,5 +1,8 @@
 import { prisma } from "../../config/prisma";
+import { getIO } from "../../config/socket";
+
 import type { NotificationType } from "../../generated/prisma/client";
+
 import { sendEmail } from "./email.service";
 import { sendSms } from "./sms.service";
 
@@ -47,13 +50,13 @@ export async function sendPatientNotification({
   }
 
   const email = patient.email || patient.user?.email || null;
+
   const phone = patient.phone || patient.user?.phone || null;
 
   const notification = await prisma.notification.create({
     data: {
       patientId,
       type,
-
       subject,
       message,
 
@@ -90,7 +93,9 @@ export async function sendPatientNotification({
       });
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown email error";
+        error instanceof Error
+          ? error.message
+          : "Unknown email error";
 
       await prisma.notification.update({
         where: {
@@ -123,7 +128,9 @@ export async function sendPatientNotification({
       });
     } catch (error) {
       const errorMessage =
-        error instanceof Error ? error.message : "Unknown SMS error";
+        error instanceof Error
+          ? error.message
+          : "Unknown SMS error";
 
       await prisma.notification.update({
         where: {
@@ -137,9 +144,19 @@ export async function sendPatientNotification({
     }
   }
 
-  return prisma.notification.findUnique({
-    where: {
-      id: notification.id,
-    },
-  });
+  const savedNotification =
+    await prisma.notification.findUnique({
+      where: {
+        id: notification.id,
+      },
+    });
+
+  if (savedNotification) {
+    getIO().emit(
+      "notification:new",
+      savedNotification
+    );
+  }
+
+  return savedNotification;
 }

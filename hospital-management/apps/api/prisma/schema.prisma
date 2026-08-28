@@ -465,6 +465,9 @@ model Patient {
   invoices          Invoice[]
   admissions        Admission[]
   allergies         PatientAllergy[]
+  medicationHistory PatientMedicationHistory[]
+  vaccinations      PatientVaccination[]
+  familyHistory     PatientFamilyHistory[]
   notifications     Notification[]
 
   @@index([phone])
@@ -500,6 +503,7 @@ enum NotificationType {
   LAB_RESULT_AVAILABLE
   IMAGING_REPORT_AVAILABLE
   DISCHARGE_SUMMARY_GENERATED
+  APPOINTMENT_REMINDER
 }
 
 enum NotificationStatus {
@@ -2033,4 +2037,70 @@ model PatientAllergy {
 
   @@index([patientId])
   @@index([allergen])
+}
+
+model PatientMedicationHistory {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  medicineName String
+  dosage       String?
+  frequency    String?
+  route        String?
+  startDate    DateTime?
+  endDate      DateTime?
+
+  isCurrent Boolean @default(true)
+  notes     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([medicineName])
+  @@index([isCurrent])
+}
+
+model PatientVaccination {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  vaccineName String
+  batchNumber String?
+
+  administeredDate DateTime
+  nextDueDate      DateTime?
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
+  @@index([vaccineName])
+  @@index([administeredDate])
+  @@index([nextDueDate])
+}
+
+model PatientFamilyHistory {
+  id String @id @default(uuid())
+
+  patientId String
+  patient   Patient @relation(fields: [patientId], references: [id])
+
+  diabetes     Boolean @default(false)
+  hypertension Boolean @default(false)
+  cancer       Boolean @default(false)
+  cardiac      Boolean @default(false)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([patientId])
 }

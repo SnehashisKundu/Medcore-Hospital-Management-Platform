@@ -1,6 +1,12 @@
 import { prisma } from "../../config/prisma";
 import { NotificationType } from "../../generated/prisma/client";
+
 import { sendPatientNotification } from "../notification/notification.service";
+
+import {
+  scheduleAppointmentReminders,
+  cancelAppointmentReminders,
+} from "../appointment-reminder/reminder.queue";
 
 interface CreateAppointmentInput {
   hospitalId: string;
@@ -87,7 +93,6 @@ async function validateAppointmentAvailability(
   scheduledEnd: Date,
   excludeAppointmentId?: string
 ) {
-  // Appointment must start and end on the same calendar day
   if (
     scheduledStart.getUTCFullYear() !== scheduledEnd.getUTCFullYear() ||
     scheduledStart.getUTCMonth() !== scheduledEnd.getUTCMonth() ||
@@ -145,7 +150,6 @@ async function validateAppointmentAvailability(
     throw new Error("INVALID_DOCTOR_SCHEDULE_SLOT");
   }
 
-  // Doctor must not be on leave during appointment time
   const leaveConflict = await prisma.doctorLeave.findFirst({
     where: {
       doctorHospitalId,
@@ -162,7 +166,6 @@ async function validateAppointmentAvailability(
     throw new Error("DOCTOR_ON_LEAVE");
   }
 
-  // Doctor must not already have another active appointment
   const appointmentConflict =
     await prisma.appointment.findFirst({
       where: {
@@ -268,39 +271,44 @@ export async function createAppointment(
   );
 
   const appointment = await prisma.appointment.create({
-      data: {
-        hospitalId: input.hospitalId,
-        patientId: input.patientId,
-        doctorHospitalId: input.doctorHospitalId,
-        doctorDepartmentAssignmentId:
-          input.doctorDepartmentAssignmentId,
+    data: {
+      hospitalId: input.hospitalId,
+      patientId: input.patientId,
+      doctorHospitalId: input.doctorHospitalId,
+      doctorDepartmentAssignmentId:
+        input.doctorDepartmentAssignmentId,
 
-        appointmentNumber:
-          input.appointmentNumber.trim(),
+      appointmentNumber:
+        input.appointmentNumber.trim(),
 
-        type: input.type ?? "OPD",
-        priority: input.priority ?? "NORMAL",
+      type: input.type ?? "OPD",
+      priority: input.priority ?? "NORMAL",
 
-        scheduledStart: start,
-        scheduledEnd: end,
+      scheduledStart: start,
+      scheduledEnd: end,
 
-        reason: input.reason?.trim(),
-        notes: input.notes?.trim(),
-      },
+      reason: input.reason?.trim(),
+      notes: input.notes?.trim(),
+    },
   });
 
-await sendPatientNotification({
-  patientId: appointment.patientId,
-  type: NotificationType.APPOINTMENT_BOOKED,
-  subject: "Appointment Booked",
-  message:
-    `Your appointment (${appointment.appointmentNumber}) ` +
-    `has been booked successfully.`,
-  referenceType: "APPOINTMENT",
-  referenceId: appointment.id,
-});
+  await scheduleAppointmentReminders(
+    appointment.id,
+    appointment.scheduledStart
+  );
 
-return appointment;
+  await sendPatientNotification({
+    patientId: appointment.patientId,
+    type: NotificationType.APPOINTMENT_BOOKED,
+    subject: "Appointment Booked",
+    message:
+      `Your appointment (${appointment.appointmentNumber}) ` +
+      `has been booked successfully.`,
+    referenceType: "APPOINTMENT",
+    referenceId: appointment.id,
+  });
+
+  return appointment;
 }
 
 export async function getAppointments() {
@@ -397,8 +405,6 @@ export async function updateAppointment(
     throw new Error("APPOINTMENT_NOT_FOUND");
   }
 
-  // Keep raw strings here so invalid dates are handled
-  // by parseAppointmentDates instead of toISOString().
   const finalStart =
     input.scheduledStart !== undefined
       ? input.scheduledStart
@@ -417,7 +423,6 @@ export async function updateAppointment(
   const finalStatus =
     input.status ?? appointment.status;
 
-  // Cancelled appointments do not occupy doctor slots.
   if (finalStatus !== "CANCELLED") {
     await validateAppointmentAvailability(
       appointment.doctorHospitalId,
@@ -428,36 +433,52 @@ export async function updateAppointment(
     );
   }
 
-  return prisma.appointment.update({
-    where: {
-      id,
-    },
-    data: {
-      type: input.type,
-      priority: input.priority,
-      status: input.status,
+  await cancelAppointmentReminders(id);
 
-      scheduledStart:
-        input.scheduledStart !== undefined
-          ? start
-          : undefined,
+  const updatedAppointment =
+    await prisma.appointment.update({
+      where: {
+        id,
+      },
+      data: {
+        type: input.type,
+        priority: input.priority,
+        status: input.status,
 
-      scheduledEnd:
-        input.scheduledEnd !== undefined
-          ? end
-          : undefined,
+        scheduledStart:
+          input.scheduledStart !== undefined
+            ? start
+            : undefined,
 
-      reason:
-        input.reason !== undefined
-          ? input.reason.trim()
-          : undefined,
+        scheduledEnd:
+          input.scheduledEnd !== undefined
+            ? end
+            : undefined,
 
-      notes:
-        input.notes !== undefined
-          ? input.notes.trim()
-          : undefined,
-    },
-  });
+        reason:
+          input.reason !== undefined
+            ? input.reason.trim()
+            : undefined,
+
+        notes:
+          input.notes !== undefined
+            ? input.notes.trim()
+            : undefined,
+      },
+    });
+
+  if (
+    updatedAppointment.status !== "CANCELLED" &&
+    updatedAppointment.status !== "COMPLETED" &&
+    !updatedAppointment.deletedAt
+  ) {
+    await scheduleAppointmentReminders(
+      updatedAppointment.id,
+      updatedAppointment.scheduledStart
+    );
+  }
+
+  return updatedAppointment;
 }
 
 export async function deleteAppointment(id: string) {
@@ -471,6 +492,8 @@ export async function deleteAppointment(id: string) {
   if (!appointment) {
     throw new Error("APPOINTMENT_NOT_FOUND");
   }
+
+  await cancelAppointmentReminders(id);
 
   return prisma.appointment.update({
     where: {
