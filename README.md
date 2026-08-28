@@ -112,6 +112,168 @@ Bed Released → Admission Discharged → Encounter Completed
 
 ------------------------------------------------------------------------
 
+
+## Project Flowcharts
+
+The diagrams below provide a visual view of how the major parts of MedCore work together.
+
+### 1. Complete System Flow
+
+```mermaid
+flowchart TD
+    A[Client / API Consumer] --> B[Express API]
+    B --> C[Authentication Middleware]
+    C --> D{Valid JWT?}
+    D -- No --> E[401 Unauthorized]
+    D -- Yes --> F[Permission / RBAC Middleware]
+    F --> G{Permission Allowed?}
+    G -- No --> H[403 Forbidden]
+    G -- Yes --> I[Controller]
+    I --> J[Service Layer]
+    J --> K[Prisma ORM]
+    K --> L[(PostgreSQL)]
+
+    J --> M[Audit Log]
+    J --> N[Notification Service]
+    N --> O[Database Notification]
+    N --> P[Email]
+    N --> Q[Twilio SMS]
+    N --> R[Socket.IO]
+    R --> S[Connected Client]
+```
+
+### 2. Core Hospital Patient Journey
+
+```mermaid
+flowchart TD
+    A[Patient Registered] --> B[Appointment]
+    B --> C[Doctor & Schedule Validation]
+    C --> D{Valid Slot?}
+    D -- No --> E[Validation Error]
+    D -- Yes --> F[Appointment Booked]
+
+    F --> G[Appointment Notification]
+    F --> H[Schedule 24h & 1h Reminders]
+
+    G --> I[Email / SMS / Socket.IO]
+    H --> J[BullMQ Queue]
+    J --> K[(Redis)]
+    K --> L[Delayed Reminder Job]
+    L --> M[Reminder Worker]
+    M --> N[Notification Service]
+
+    F --> O[Encounter]
+    O --> P{Care Type}
+    P -- OPD --> Q[Vitals / Clinical Notes / Diagnosis]
+    P -- IPD --> R[Admission]
+    R --> S[Bed Allocation]
+    S --> T[Inpatient Treatment]
+
+    Q --> U[Prescription / Diagnostics / Procedures]
+    T --> U
+    U --> V[Billing]
+    V --> W[Payment]
+    W --> X{IPD Patient?}
+    X -- Yes --> Y[Discharge Summary]
+    Y --> Z[Bed Released]
+    Z --> AA[Encounter Completed]
+    X -- No --> AA
+```
+
+### 3. Appointment Creation and Validation Flow
+
+```mermaid
+flowchart TD
+    A[POST /appointments] --> B[Authenticate User]
+    B --> C[Check APPOINTMENT_CREATE Permission]
+    C --> D[Validate Required Fields]
+    D --> E[Validate Hospital]
+    E --> F[Validate Patient]
+    F --> G[Validate Doctor Hospital Assignment]
+    G --> H[Validate Department Assignment]
+    H --> I[Validate Date Range]
+    I --> J[Check Doctor Schedule]
+    J --> K[Check Valid Schedule Slot]
+    K --> L[Check Doctor Leave]
+    L --> M[Check Appointment Conflict]
+    M --> N[Create Appointment]
+    N --> O[Create Audit Log]
+    N --> P[Create Notification]
+    N --> Q[Schedule Reminder Jobs]
+    Q --> R[24 Hours Before]
+    Q --> S[1 Hour Before]
+```
+
+### 4. Real-Time Notification Flow
+
+```mermaid
+sequenceDiagram
+    participant API as Express API
+    participant Service as Business Service
+    participant DB as PostgreSQL
+    participant Notify as Notification Service
+    participant SMS as Twilio
+    participant Socket as Socket.IO
+    participant Client as Connected Client
+
+    API->>Service: Create / Update Business Event
+    Service->>DB: Save Business Data
+    Service->>Notify: sendPatientNotification()
+    Notify->>DB: Create Notification Record
+    Notify->>SMS: Send SMS
+    SMS-->>Notify: SENT / FAILED
+    Notify->>DB: Update Delivery Status
+    Notify->>Socket: emit("notification:new")
+    Socket-->>Client: Real-Time Notification
+```
+
+### 5. BullMQ Appointment Reminder Flow
+
+```mermaid
+flowchart TD
+    A[Appointment Created / Updated] --> B[Schedule Reminder Jobs]
+    B --> C[24 Hour Job]
+    B --> D[1 Hour Job]
+
+    C --> E[BullMQ Queue]
+    D --> E
+    E --> F[(Redis)]
+
+    F --> G[Delayed Job Waits]
+    G --> H{Scheduled Time Reached?}
+    H -- No --> G
+    H -- Yes --> I[Reminder Worker]
+
+    I --> J[Load Appointment]
+    J --> K{Appointment Still Active?}
+    K -- No --> L[Skip Reminder]
+    K -- Yes --> M[Create APPOINTMENT_REMINDER Notification]
+
+    M --> N[Email]
+    M --> O[Twilio SMS]
+    M --> P[Socket.IO]
+    N --> Q[Update Notification Status]
+    O --> Q
+    P --> R[notification:new Event]
+```
+
+### 6. RBAC Authorization Flow
+
+```mermaid
+flowchart LR
+    A[User] --> B[JWT Access Token]
+    B --> C[authenticate Middleware]
+    C --> D[req.user]
+    D --> E[User Role]
+    E --> F[Role]
+    F --> G[Role Permission]
+    G --> H[Permission]
+    H --> I{Required Permission?}
+    I -- Granted --> J[Controller]
+    I -- Missing --> K[403 Forbidden]
+```
+
+
 ## System Architecture
 
 ``` text
