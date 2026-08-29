@@ -1,20 +1,10 @@
-import { Router } from "express";
-
-import {
-  createChargeController,
-  getChargesController,
-  getChargeByIdController,
-  createInvoiceController,
-  getInvoicesController,
-  getInvoiceByIdController,
-  updateInvoiceController,
-} from "./bil.controller";
-
-import { authenticate } from "../auth/auth.middleware";
-import { requirePermission } from "../../middleware/permission.middleware";
-
-const router = Router();
-
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const express_1 = require("express");
+const bil_controller_1 = require("./bil.controller");
+const auth_middleware_1 = require("../auth/auth.middleware");
+const permission_middleware_1 = require("../../middleware/permission.middleware");
+const router = (0, express_1.Router)();
 /**
  * @swagger
  * /api/v1/charges:
@@ -75,13 +65,7 @@ const router = Router();
  *       500:
  *         description: Internal server error
  */
-router.post(
-  "/charges",
-  authenticate,
-  requirePermission("BILLING_CREATE"),
-  createChargeController
-);
-
+router.post("/charges", auth_middleware_1.authenticate, (0, permission_middleware_1.requirePermission)("BILLING_CREATE"), bil_controller_1.createChargeController);
 /**
  * @swagger
  * /api/v1/charges:
@@ -102,13 +86,7 @@ router.post(
  *       500:
  *         description: Internal server error
  */
-router.get(
-  "/charges",
-  authenticate,
-  requirePermission("BILLING_READ"),
-  getChargesController
-);
-
+router.get("/charges", auth_middleware_1.authenticate, (0, permission_middleware_1.requirePermission)("BILLING_READ"), bil_controller_1.getChargesController);
 /**
  * @swagger
  * /api/v1/charges/{id}:
@@ -139,13 +117,7 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-router.get(
-  "/charges/:id",
-  authenticate,
-  requirePermission("BILLING_READ"),
-  getChargeByIdController
-);
-
+router.get("/charges/:id", auth_middleware_1.authenticate, (0, permission_middleware_1.requirePermission)("BILLING_READ"), bil_controller_1.getChargeByIdController);
 /**
  * @swagger
  * /api/v1/invoices:
@@ -200,13 +172,7 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-router.post(
-  "/invoices",
-  authenticate,
-  requirePermission("BILLING_CREATE"),
-  createInvoiceController
-);
-
+router.post("/invoices", auth_middleware_1.authenticate, (0, permission_middleware_1.requirePermission)("BILLING_CREATE"), bil_controller_1.createInvoiceController);
 /**
  * @swagger
  * /api/v1/invoices:
@@ -227,13 +193,7 @@ router.post(
  *       500:
  *         description: Internal server error
  */
-router.get(
-  "/invoices",
-  authenticate,
-  requirePermission("BILLING_READ"),
-  getInvoicesController
-);
-
+router.get("/invoices", auth_middleware_1.authenticate, (0, permission_middleware_1.requirePermission)("BILLING_READ"), bil_controller_1.getInvoicesController);
 /**
  * @swagger
  * /api/v1/invoices/{id}:
@@ -264,13 +224,7 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-router.get(
-  "/invoices/:id",
-  authenticate,
-  requirePermission("BILLING_READ"),
-  getInvoiceByIdController
-);
-
+router.get("/invoices/:id", auth_middleware_1.authenticate, (0, permission_middleware_1.requirePermission)("BILLING_READ"), bil_controller_1.getInvoiceByIdController);
 /**
  * @swagger
  * /api/v1/invoices/{id}:
@@ -319,11 +273,5 @@ router.get(
  *       500:
  *         description: Internal server error
  */
-router.put(
-  "/invoices/:id",
-  authenticate,
-  requirePermission("BILLING_UPDATE"),
-  updateInvoiceController
-);
-
-export default router;
+router.put("/invoices/:id", auth_middleware_1.authenticate, (0, permission_middleware_1.requirePermission)("BILLING_UPDATE"), bil_controller_1.updateInvoiceController);
+exports.default = router;
