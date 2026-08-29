@@ -20,6 +20,10 @@ const swaggerDefinition = {
             url: "http://localhost:3000",
             description: "Local development server",
         },
+        {
+            url: "https://medcore-hms-api-5v3l.onrender.com",
+            description: "Production server",
+        },
     ],
     components: {
         securitySchemes: {
